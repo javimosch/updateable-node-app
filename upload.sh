@@ -8,10 +8,15 @@ if [ "$1" == "--debug" ]; then
 fi
 
 # Default values
-USERNAME=${1:-admin}
-PASSWORD=${2:-password}
 URL=${3:-http://localhost:3888/upload}
 BLACKLIST_FILE=".upload_blacklist"
+BEARER_FILE=".upload_bearer"
+BEARER_TOKEN=""
+
+# Load bearer token from file if exists
+if [ -f "$BEARER_FILE" ]; then
+  BEARER_TOKEN=$(cat "$BEARER_FILE")
+fi
 
 # Default base path is current directory
 BASE_PATH=$(pwd)
@@ -99,6 +104,30 @@ select_folder() {
   fi
 }
 
+# Function to set bearer token
+set_bearer_token() {
+  show_header
+  echo "Current Bearer token: ${BEARER_TOKEN:0:4}..."
+  echo ""
+  read -p "Enter new Bearer token (or press Enter to keep current): " new_token
+  if [ -n "$new_token" ]; then
+    BEARER_TOKEN="$new_token"
+    echo "$BEARER_TOKEN" > "$BEARER_FILE"
+    echo "Bearer token updated."
+  else
+    echo "Bearer token unchanged."
+  fi
+  read -p "Press Enter to continue..."
+}
+
+# Function to clear bearer token
+clear_bearer_token() {
+  BEARER_TOKEN=""
+  rm -f "$BEARER_FILE"
+  echo "Bearer token cleared."
+  read -p "Press Enter to continue..."
+}
+
 # Function to zip and send a folder
 send_folder() {
   local folder_to_zip="$1"
@@ -158,7 +187,11 @@ send_folder() {
   echo "Uploading to $URL..."
   echo "This may take a while depending on the folder size..."
   echo ""
-  curl -u "$USERNAME:$PASSWORD" -F "file=@$temp_zip_file" "$URL" --progress-bar
+  if [ -n "$BEARER_TOKEN" ]; then
+    curl -v -H "Authorization: Bearer $BEARER_TOKEN" -F "file=@$temp_zip_file" "$URL" --progress-bar
+  else
+    curl -v -F "file=@$temp_zip_file" "$URL" --progress-bar
+  fi
   echo ""
   
   # Clean up
@@ -263,7 +296,9 @@ while true; do
   echo "2. Set upload URL"
   echo "3. Select folder to send"
   echo "4. Manage blacklist"
-  echo "5. Exit"
+  echo "5. Set Bearer token"
+  echo "6. Clear Bearer token"
+  echo "7. Exit"
   echo ""
   read -p "Enter your choice: " choice
   
@@ -272,7 +307,9 @@ while true; do
     2) set_upload_url ;;
     3) select_folder ;;
     4) manage_blacklist ;;
-    5) exit 0 ;;
+    5) set_bearer_token ;;
+    6) clear_bearer_token ;;
+    7) exit 0 ;;
     *) echo "Invalid choice"; read -p "Press Enter to continue..." ;;
   esac
 done
