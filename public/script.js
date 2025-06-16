@@ -49,6 +49,15 @@
     setTimeout(() => toast.remove(), 3000);
   }
 
+  // Track user editing state for command/basePath
+  let isEditingCommand = false;
+  let isEditingBasePath = false;
+
+  commandInput.addEventListener('focus', () => { isEditingCommand = true; });
+  commandInput.addEventListener('blur', () => { isEditingCommand = false; });
+  basePathInput.addEventListener('focus', () => { isEditingBasePath = true; });
+  basePathInput.addEventListener('blur', () => { isEditingBasePath = false; });
+
   function updateStatusBadge(running) {
     statusDiv.className = running ? 'stat-value text-lg text-success' : 'stat-value text-lg text-error';
     statusDiv.textContent = running ? 'Running' : 'Stopped';
@@ -71,8 +80,8 @@
       updateStatusBadge(data.running);
       startButton.hidden = data.running;
       stopButton.hidden = !data.running;
-      commandInput.value = data.command;
-      basePathInput.value = data.basePath || 'N/A';
+      if (!isEditingCommand) commandInput.value = data.command;
+      if (!isEditingBasePath) basePathInput.value = data.basePath || 'N/A';
       lastUploadSpan.textContent = data.lastUploadDate ? new Date(data.lastUploadDate).toLocaleString() : 'N/A';
       selectedEnvFromServer = data.selectedEnv;
       updateEnvDropdown();
