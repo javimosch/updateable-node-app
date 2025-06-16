@@ -36,6 +36,23 @@
   let currentEnvs = [];
   let selectedEnvFromServer = null;
 
+  // --- UI Helper Functions ---
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} fixed top-4 right-4 w-auto z-50 shadow-lg`;
+    toast.innerHTML = `
+      <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle"></i>
+      <span>${message}</span>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function updateStatusBadge(running) {
+    statusDiv.className = running ? 'stat-value text-lg text-success' : 'stat-value text-lg text-error';
+    statusDiv.textContent = running ? 'Running' : 'Stopped';
+  }
+
   // --- API Helpers ---
   async function apiCall(url, options = {}) {
     const res = await fetch(url, options);
@@ -50,7 +67,7 @@
   async function fetchStatus() {
     try {
       const data = await apiCall('/status');
-      statusDiv.textContent = data.running ? 'Running' : 'Stopped';
+      updateStatusBadge(data.running);
       startButton.hidden = data.running;
       stopButton.hidden = !data.running;
       commandInput.value = data.command;
@@ -60,6 +77,7 @@
       updateEnvDropdown();
     } catch (err) {
       statusDiv.textContent = 'Error getting status';
+      statusDiv.className = 'stat-value text-lg text-error';
       console.error(err);
     }
   }
@@ -67,6 +85,7 @@
   // --- Deployment Management ---
   const deploymentsList = document.getElementById('deploymentsList');
   const currentDeploymentSpan = document.getElementById('currentDeployment');
+  const currentDeploymentText = document.getElementById('currentDeploymentText');
 
   async function fetchDeployments() {
     try {
@@ -76,8 +95,9 @@
       ]);
       renderDeployments(versions, currentObj.current);
     } catch (err) {
-      deploymentsList.innerHTML = '<li style="color:red">Failed to load deployments</li>';
+      deploymentsList.innerHTML = '<li class="text-error">Failed to load deployments</li>';
       currentDeploymentSpan.textContent = 'N/A';
+      currentDeploymentText.textContent = 'N/A';
       console.debug('[Deployments] Error:', err);
     }
   }
@@ -85,36 +105,52 @@
   function renderDeployments(versions, current) {
     deploymentsList.innerHTML = '';
     currentDeploymentSpan.textContent = current || 'N/A';
+    currentDeploymentText.textContent = current || 'N/A';
+    
     if (!versions?.length) {
-      deploymentsList.innerHTML = '<li>No deployments found</li>';
+      deploymentsList.innerHTML = '<li class="text-base-content/60">No deployments found</li>';
       return;
     }
+    
     versions.forEach(version => {
       const li = document.createElement('li');
-      li.textContent = version + (version === current ? ' (current)' : '');
+      li.className = 'flex justify-between items-center p-2 bg-base-200 rounded-lg';
+      
+      const versionSpan = document.createElement('span');
+      versionSpan.textContent = version;
+      versionSpan.className = version === current ? 'font-bold text-primary' : '';
+      
+      li.appendChild(versionSpan);
+      
       if (version !== current) {
         const btn = document.createElement('button');
-        btn.textContent = 'Rollback';
-        btn.style.marginLeft = '1em';
+        btn.className = 'btn btn-sm btn-outline btn-secondary';
+        btn.innerHTML = '<i class="fas fa-undo mr-1"></i>Rollback';
         btn.onclick = async () => {
           if (!confirm(`Rollback to deployment ${version}?`)) return;
           btn.disabled = true;
-          btn.textContent = 'Rolling back...';
+          btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>Rolling back...';
           try {
             await apiCall(`/api/deployments/rollback/${version}`, { method: 'POST' });
             await fetchDeployments();
             await fetchStatus();
-            alert(`Rolled back to ${version}`);
+            showToast(`Rolled back to ${version}`, 'success');
           } catch (err) {
-            alert(`Failed to rollback: ${err.message}`);
+            showToast(`Failed to rollback: ${err.message}`, 'error');
             console.debug('[Deployments] Rollback error:', err);
           } finally {
             btn.disabled = false;
-            btn.textContent = 'Rollback';
+            btn.innerHTML = '<i class="fas fa-undo mr-1"></i>Rollback';
           }
         };
         li.appendChild(btn);
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-primary';
+        badge.textContent = 'Current';
+        li.appendChild(badge);
       }
+      
       deploymentsList.appendChild(li);
     });
     console.debug('[Deployments] Rendered', { versions, current });
@@ -126,7 +162,7 @@
       currentEnvs = await apiCall('/api/envs');
       updateEnvDropdown();
     } catch (err) {
-      alert(`Error fetching envs: ${err.message}`);
+      showToast(`Error fetching envs: ${err.message}`, 'error');
     }
   }
 
@@ -158,7 +194,7 @@
         envNameInput.readOnly = true;
         deleteEnvButton.hidden = false;
       } catch (err) {
-        alert(`Error loading env: ${err.message}`);
+        showToast(`Error loading env: ${err.message}`, 'error');
       }
     } else {
       envNameInput.value = '';
@@ -179,9 +215,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: commandInput.value }),
       });
-      alert('Config saved');
+      showToast('Configuration saved successfully', 'success');
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   });
 
@@ -189,33 +225,70 @@
   uploadForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!fileInput.files.length) return;
+    
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
     const xhr = new XMLHttpRequest();
+    
     xhr.open('POST', '/upload');
     xhr.upload.onprogress = (evt) => {
-      if (evt.lengthComputable) progressEl.value = (evt.loaded / evt.total) * 100;
+      if (evt.lengthComputable) {
+        const percent = (evt.loaded / evt.total) * 100;
+        progressEl.value = percent;
+      }
     };
-    xhr.onloadstart = () => { progressEl.hidden = false; progressEl.value = 0; };
+    
+    xhr.onloadstart = () => { 
+      progressEl.hidden = false; 
+      progressEl.value = 0; 
+    };
+    
     xhr.onload = () => {
       progressEl.hidden = true;
-      alert(xhr.responseText);
-      if (xhr.status === 200) fetchStatus();
+      if (xhr.status === 200) {
+        showToast('Upload successful! Application deployed.', 'success');
+        fetchStatus();
+        fetchDeployments();
+      } else {
+        showToast('Upload failed', 'error');
+      }
     };
-    xhr.onerror = () => { progressEl.hidden = true; alert('Upload failed'); };
+    
+    xhr.onerror = () => { 
+      progressEl.hidden = true; 
+      showToast('Upload failed', 'error');
+    };
+    
     xhr.send(formData);
   });
 
   // Action buttons
-  startButton.addEventListener('click', () => apiCall('/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ command: commandInput.value }),
-  }).then(fetchStatus).catch(alert));
-  stopButton.addEventListener('click', () => apiCall('/stop', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  }).then(fetchStatus).catch(alert));
+  startButton.addEventListener('click', async () => {
+    try {
+      await apiCall('/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: commandInput.value }),
+      });
+      showToast('Application started', 'success');
+      fetchStatus();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  stopButton.addEventListener('click', async () => {
+    try {
+      await apiCall('/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      showToast('Application stopped', 'success');
+      fetchStatus();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
 
   // ENV Listeners
   envSelect.addEventListener('change', async () => {
@@ -229,7 +302,7 @@
         });
         selectedEnvFromServer = selected;
       } catch (err) {
-        alert(`Failed to set active env: ${err.message}`);
+        showToast(`Failed to set active env: ${err.message}`, 'error');
       }
     }
     handleEnvSelection();
@@ -237,18 +310,21 @@
 
   saveEnvButton.addEventListener('click', async () => {
     const name = envNameInput.value.trim();
-    if (!name) return alert('Config Name is required.');
+    if (!name) {
+      showToast('Config Name is required.', 'error');
+      return;
+    }
     try {
       await apiCall('/api/envs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, content: envContentArea.value }),
       });
-      alert('Environment config saved.');
-      selectedEnvFromServer = name; // Select the newly saved env
-      await fetchEnvs(); // this will re-render dropdown and select the new one
+      showToast('Environment config saved.', 'success');
+      selectedEnvFromServer = name;
+      await fetchEnvs();
     } catch (err) {
-      alert(`Error saving env: ${err.message}`);
+      showToast(`Error saving env: ${err.message}`, 'error');
     }
   });
 
@@ -257,20 +333,20 @@
     if (!name || !confirm(`Are you sure you want to delete the '${name}' config?`)) return;
     try {
       await apiCall(`/api/envs/${name}`, { method: 'DELETE' });
-      alert('Environment config deleted.');
+      showToast('Environment config deleted.', 'success');
       envNameInput.value = '';
       envContentArea.value = '';
-      selectedEnvFromServer = null; // Unset selection
+      selectedEnvFromServer = null;
       await fetchEnvs();
     } catch (err) {
-      alert(`Error deleting env: ${err.message}`);
+      showToast(`Error deleting env: ${err.message}`, 'error');
     }
   });
 
   // --- Initialization ---
   function init() {
     fetchDeployments();
-    setInterval(fetchDeployments, 10000); // Poll every 10s
+    setInterval(fetchDeployments, 10000);
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProto}//${location.host}`);
@@ -281,10 +357,8 @@
     };
 
     fetchEnvs();
-    setInterval(fetchStatus, 5000); // Poll less frequently
+    setInterval(fetchStatus, 5000);
     fetchStatus();
-    // Also re-fetch deployments after upload or rollback
-  
   }
 
   // Log filter event
@@ -297,6 +371,7 @@
   clearLogsButton?.addEventListener('click', () => {
     allLogs = [];
     renderLogs();
+    showToast('Logs cleared', 'info');
     console.debug('[Logs] Cleared');
   });
 

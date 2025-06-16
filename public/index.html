@@ -1,126 +1,244 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Node App Runner</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0 auto;
-        max-width: 800px;
-        padding: 1rem;
-        background: #f4f4f4;
-      }
-      h1 {
-        text-align: center;
-      }
-      section {
-        background: #fff;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      label {
-        display: block;
-        margin-top: 0.5rem;
-      }
-      input[type="text"],
-      input[type="file"] {
-        width: 100%;
-        padding: 0.5rem;
-        margin-top: 0.25rem;
-        box-sizing: border-box;
-      }
-      button {
-        margin-top: 0.75rem;
-        padding: 0.5rem 1rem;
-        cursor: pointer;
-      }
-      #logs {
-        height: 300px;
-        overflow: auto;
-        background: #000;
-        color: #0f0;
-        padding: 0.5rem;
-        font-family: monospace;
-        font-size: 0.85rem;
-      }
-      progress {
-        width: 100%;
-        height: 16px;
-      }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   </head>
-  <body>
-    <h1>Node App Runner</h1>
-
-    <section>
-      <h2>Configuration</h2>
-      <form id="configForm">
-        <label>Command
-          <input type="text" id="command" value="npm run start" />
-        </label>
-        <label>Base Path
-          <input type="text" id="basePath" value="/app" />
-        </label>
-        <button type="submit">Save</button>
-      </form>
-    </section>
-
-    <section>
-      <h2>Upload App</h2>
-      <form id="uploadForm">
-        <input type="file" id="fileInput" accept=".zip" required />
-        <button type="submit">Upload</button>
-        <progress id="uploadProgress" value="0" max="100" hidden></progress>
-      </form>
-    </section>
-
-    <section>
-      <h2>Status</h2>
-      <div id="status">Unknown</div>
-      <div><strong>Last Upload:</strong> <span id="lastUpload">N/A</span></div>
-
-      <div id="actions" style="margin-top: 1rem;">
-        <button id="startButton" hidden>Start</button>
-        <button id="stopButton" hidden>Stop</button>
+  <body class="bg-base-200 min-h-screen">
+    <!-- Header -->
+    <div class="navbar bg-primary text-primary-content shadow-lg">
+      <div class="flex-1">
+        <h1 class="text-xl font-bold">
+          <i class="fas fa-server mr-2"></i>
+          Node App Runner
+        </h1>
       </div>
-    </section>
-
-    <section>
-      <h2>Deployment Management</h2>
-      <div><strong>Current Deployment:</strong> <span id="currentDeployment">N/A</span></div>
-      <ul id="deploymentsList" style="padding-left: 1.2em;"></ul>
-    </section>
-
-    <section>
-      <h2>Environment Configurations</h2>
-      <div class="form-grid">
-        <label for="envSelect">Select/Manage Config:</label>
-        <select id="envSelect"></select>
-
-        <label for="envName">Config Name:</label>
-        <input type="text" id="envName" placeholder="e.g., production, test" />
-
-        <label for="envContent">.env Content:</label>
-        <textarea id="envContent" rows="8" placeholder="KEY=VALUE
-ANOTHER_KEY=another_value"></textarea>
+      <div class="flex-none">
+        <div class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+            <i class="fas fa-palette text-lg"></i>
+          </div>
+          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+            <li><a onclick="setTheme('light')"><i class="fas fa-sun mr-2"></i>Light</a></li>
+            <li><a onclick="setTheme('dark')"><i class="fas fa-moon mr-2"></i>Dark</a></li>
+            <li><a onclick="setTheme('cupcake')"><i class="fas fa-heart mr-2"></i>Cupcake</a></li>
+            <li><a onclick="setTheme('cyberpunk')"><i class="fas fa-robot mr-2"></i>Cyberpunk</a></li>
+          </ul>
+        </div>
       </div>
-      <div id="envActions" style="margin-top: 1rem;">
-          <button id="saveEnvButton">Save</button>
-          <button id="deleteEnvButton">Delete</button>
-      </div>
-    </section>
+    </div>
 
-    <section>
-      <h2>Logs</h2>
-      <div style="margin-bottom: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
-        <input type="text" id="logFilter" placeholder="Filter logs..." style="flex: 1; padding: 0.25rem;" />
-        <button id="clearLogsButton" type="button">Clear Logs</button>
+    <div class="container mx-auto p-4 max-w-7xl">
+      <!-- Status Overview Card -->
+      <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+          <h2 class="card-title text-2xl">
+            <i class="fas fa-tachometer-alt mr-2"></i>
+            System Status
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div class="stat bg-base-200 rounded-lg">
+              <div class="stat-figure text-primary">
+                <i class="fas fa-play-circle text-3xl"></i>
+              </div>
+              <div class="stat-title">App Status</div>
+              <div class="stat-value text-lg" id="status">Unknown</div>
+            </div>
+            <div class="stat bg-base-200 rounded-lg">
+              <div class="stat-figure text-secondary">
+                <i class="fas fa-upload text-3xl"></i>
+              </div>
+              <div class="stat-title">Last Upload</div>
+              <div class="stat-value text-sm" id="lastUpload">N/A</div>
+            </div>
+            <div class="stat bg-base-200 rounded-lg">
+              <div class="stat-figure text-accent">
+                <i class="fas fa-code-branch text-3xl"></i>
+              </div>
+              <div class="stat-title">Current Deployment</div>
+              <div class="stat-value text-sm" id="currentDeployment">N/A</div>
+            </div>
+          </div>
+          <div class="card-actions justify-end mt-4">
+            <button id="startButton" class="btn btn-success" hidden>
+              <i class="fas fa-play mr-2"></i>Start
+            </button>
+            <button id="stopButton" class="btn btn-error" hidden>
+              <i class="fas fa-stop mr-2"></i>Stop
+            </button>
+          </div>
+        </div>
       </div>
-      <pre id="logs"></pre>
-    </section>
+
+      <!-- Main Content Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left Column -->
+        <div class="space-y-6">
+          <!-- Configuration Card -->
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                <i class="fas fa-cog mr-2"></i>
+                Configuration
+              </h2>
+              <form id="configForm" class="space-y-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">
+                      <i class="fas fa-terminal mr-2"></i>Command
+                    </span>
+                  </label>
+                  <input type="text" id="command" value="npm run start" 
+                         class="input input-bordered w-full" placeholder="e.g., npm run start" />
+                </div>
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">
+                      <i class="fas fa-folder mr-2"></i>Base Path
+                    </span>
+                  </label>
+                  <input type="text" id="basePath" value="/app" 
+                         class="input input-bordered w-full" readonly />
+                </div>
+                <div class="card-actions justify-end">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>Save Config
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Upload Card -->
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                <i class="fas fa-cloud-upload-alt mr-2"></i>
+                Upload Application
+              </h2>
+              <form id="uploadForm" class="space-y-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Select ZIP file</span>
+                  </label>
+                  <input type="file" id="fileInput" accept=".zip" required 
+                         class="file-input file-input-bordered w-full" />
+                </div>
+                <progress id="uploadProgress" class="progress progress-primary w-full" value="0" max="100" hidden></progress>
+                <div class="card-actions justify-end">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload mr-2"></i>Upload & Deploy
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Environment Configurations Card -->
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                <i class="fas fa-env mr-2"></i>
+                Environment Configurations
+              </h2>
+              <div class="space-y-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Select/Manage Config</span>
+                  </label>
+                  <select id="envSelect" class="select select-bordered w-full">
+                    <option value="">[None]</option>
+                    <option value="__new__">[Create New]</option>
+                  </select>
+                </div>
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Config Name</span>
+                  </label>
+                  <input type="text" id="envName" placeholder="e.g., production, test" 
+                         class="input input-bordered w-full" />
+                </div>
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">.env Content</span>
+                  </label>
+                  <textarea id="envContent" rows="6" 
+                            placeholder="KEY=VALUE&#10;ANOTHER_KEY=another_value"
+                            class="textarea textarea-bordered w-full"></textarea>
+                </div>
+                <div class="card-actions justify-end space-x-2">
+                  <button id="deleteEnvButton" class="btn btn-error" hidden>
+                    <i class="fas fa-trash mr-2"></i>Delete
+                  </button>
+                  <button id="saveEnvButton" class="btn btn-success">
+                    <i class="fas fa-save mr-2"></i>Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+          <!-- Deployment Management Card -->
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                <i class="fas fa-history mr-2"></i>
+                Deployment History
+              </h2>
+              <div class="space-y-3">
+                <div class="alert alert-info">
+                  <i class="fas fa-info-circle"></i>
+                  <span>Current: <strong id="currentDeploymentText">N/A</strong></span>
+                </div>
+                <div class="divider">Previous Deployments</div>
+                <ul id="deploymentsList" class="space-y-2"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs Card -->
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                <i class="fas fa-file-alt mr-2"></i>
+                Application Logs
+              </h2>
+              <div class="space-y-4">
+                <div class="flex gap-2">
+                  <input type="text" id="logFilter" placeholder="Filter logs..." 
+                         class="input input-bordered flex-1" />
+                  <button id="clearLogsButton" class="btn btn-outline">
+                    <i class="fas fa-trash mr-2"></i>Clear
+                  </button>
+                </div>
+                <div class="mockup-code bg-black text-green-400 h-80 overflow-auto">
+                  <pre id="logs" class="text-sm"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme Switcher Script -->
+    <script>
+      function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+      }
+      
+      // Load saved theme
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      setTheme(savedTheme);
+    </script>
 
     <script src="script.js"></script>
   </body>
