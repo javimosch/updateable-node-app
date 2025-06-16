@@ -1,98 +1,85 @@
-# Updateable Node.js Docker Container
+# Updateable Node.js Docker Container 🚀
 
-This project provides a Docker container that can run any Node.js application and be updated on the fly via a simple web UI or a command-line script.
+This project gives you a simple Docker container for running Node.js apps that you can update easily with a web UI or a command-line script. 😊 It's lightweight and flexible for deploying apps.
 
-It's designed to be a lightweight and flexible solution for deploying and managing Node.js applications in a containerized environment.
+## Features 👍
+- Web UI to manage your app.
+- Update apps on the fly by uploading a zip file – no downtime needed!
+- Saves your settings so they stick after restarts.
+- Keeps up to 5 app versions for easy rollbacks.
+- Shows real-time logs in the UI.
+- Secured with basic login.
+- Lets you handle environment variables right from the UI.
+- Includes an interactive script for uploading apps.
 
-## Features
-
-- **Web UI**: A simple web interface to manage the application.
-- **On-the-fly Updates**: Upload a zip file of your Node.js application, and the container will automatically start running it.
-- **Persistent Configuration**: The run command is saved in a `config.json` file and persists across container restarts.
-- **Versioned Deployments**: The container keeps the last 5 deployments, making it possible to implement rollbacks in the future.
-- **Real-time Logs**: View real-time `stdout` and `stderr` from your application in the web UI.
-- **Basic Authentication**: The web UI is protected by basic authentication.
-- **Environment Variable Management**: Configure and select different sets of environment variables for your application directly from the web UI.
-- **Interactive Upload Script**: An interactive `upload.sh` script to easily package and upload your applications.
-
-## How to use
-
+## How to Use 👣
 ### 1. Build the Docker image
+Run this command to build it:
 
 ```bash
 docker build -t updateable-node-app .
 ```
 
-### 2. Run the Docker container
-
-You can run the container with default credentials (`admin`/`password`) on port `3000`:
+### 2. Run the container
+Start with default login (user: admin, pass: password) on port 3000:
 
 ```bash
 docker run -p 3000:3000 -d --name my-node-app updateable-node-app
 ```
 
-To use custom credentials, set the `WEBUI_USER` and `WEBUI_PASSWORD` environment variables:
+Or use custom login by setting environment variables:
 
 ```bash
-docker run -p 3000:3000 -d \
-  -e WEBUI_USER=myuser \
-  -e WEBUI_PASSWORD=mypassword \
-  --name my-node-app \
-  updateable-node-app
+docker run -p 3000:3000 -d -e WEBUI_USER=myuser -e WEBUI_PASSWORD=mypassword --name my-node-app updateable-node-app
 ```
 
 ### 3. Access the Web UI
-
-Open your browser and navigate to `http://localhost:3000`. You will be prompted for the username and password.
+Open your browser and go to `http://localhost:3000`. Log in with your username and password.
 
 ### 4. Using the Web UI
+- **Configuration**: Set the app's run command (e.g., `node index.js`) – it saves automatically.
+- **Upload App**: Upload a zip file of your Node.js app; it will start running right away.
+- **Status**: Check if your app is running and when it was last updated.
+- **Actions**: Start or stop your app manually.
+- **Environment Settings**: Create, edit, or choose different env configs.
+- **Logs**: Watch live output from your app.
 
-- **Configuration**: Set the command to run your application (e.g., `npm run start`, `node index.js`). This is saved automatically.
-- **Upload App**: Upload a `.zip` file containing your Node.js application, including `node_modules`. The container will stop the current application, extract the new one, and start it.
-- **Status**: View the current status of the application (Running/Stopped) and the last upload date.
-- **Actions**: Start or stop the application manually.
-- **Environment Configurations**: Create, edit, delete, and select environment configurations. The selected configuration will be loaded into your application when it starts.
-- **Logs**: View real-time logs from your application.
+### 5. Using the upload.sh script
+This script makes uploading easy. First, make it executable:
 
-### 5. Using the `upload.sh` script
-
-The `upload.sh` script provides an interactive way to upload your application.
-
-Make it executable:
 ```bash
 chmod +x upload.sh
 ```
 
-Run it:
+Then run it interactively:
+
 ```bash
 ./upload.sh
 ```
 
-You can also provide credentials and the URL as arguments:
+Or with arguments for quicker use:
+
 ```bash
 ./upload.sh <username> <password> <url>
 ```
+It helps you pick a folder, zip it, and upload it.
 
-The script will guide you through selecting a base path and a folder to zip and upload.
+## Project Structure 📁
+- `Dockerfile`: Sets up the Docker image.
+- `server.js`: Runs the web UI and API.
+- `package.json`: Lists dependencies for the UI server.
+- `public/`: Holds the web UI files (HTML, CSS, JS).
+- `upload.sh`: Script for interactive uploads.
+- `config.json`: Stores settings like run commands.
+- `deployments/`: Keeps different app versions.
+- `env-configs/`: Manages your .env files.
+- `uploads/`: Temp folder for file uploads.
 
-## Project Structure
-
-- `Dockerfile`: Defines the Docker image.
-- `server.js`: The Node.js/Express server for the web UI and API.
-- `package.json`: Dependencies for the web UI server.
-- `public/`: Static files for the web UI (HTML, CSS, JS).
-- `upload.sh`: Interactive script to upload applications.
-- `config.json` (generated): Stores the persistent configuration (run command, selected env, etc.).
-- `deployments/` (generated): Stores the versioned deployments.
-- `env-configs/` (generated): Stores your `.env.*` configuration files.
-- `uploads/` (generated): Temporary directory for uploads.
-
-## How it works
-
-The `server.js` application provides a web UI and an API to manage a child process. When you upload a zip file, the server:
-1. Stops the currently running application (if any).
-2. Creates a new timestamped directory in `deployments/`.
-3. Extracts the contents of the zip file into the new directory.
-4. Updates `config.json` with the path to the new deployment and the upload date.
-5. Prunes old deployments, keeping only the last 5.
-6. Starts the new application using the configured command.
+## How It Works ⚙️
+The `server.js` app manages a child process for your Node.js app. When you upload a zip:
+1. Stops the current app if running.
+2. Makes a new folder for the update.
+3. Unzips your file there.
+4. Updates the config with the new path and date.
+5. Removes old versions, keeping only the last 5.
+6. Starts your app with the set command.
