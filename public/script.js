@@ -64,6 +64,62 @@
     }
   }
 
+  // --- Deployment Management ---
+  const deploymentsList = document.getElementById('deploymentsList');
+  const currentDeploymentSpan = document.getElementById('currentDeployment');
+
+  async function fetchDeployments() {
+    try {
+      const [versions, currentObj] = await Promise.all([
+        apiCall('/api/deployments'),
+        apiCall('/api/deployment/current'),
+      ]);
+      renderDeployments(versions, currentObj.current);
+    } catch (err) {
+      deploymentsList.innerHTML = '<li style="color:red">Failed to load deployments</li>';
+      currentDeploymentSpan.textContent = 'N/A';
+      console.debug('[Deployments] Error:', err);
+    }
+  }
+
+  function renderDeployments(versions, current) {
+    deploymentsList.innerHTML = '';
+    currentDeploymentSpan.textContent = current || 'N/A';
+    if (!versions?.length) {
+      deploymentsList.innerHTML = '<li>No deployments found</li>';
+      return;
+    }
+    versions.forEach(version => {
+      const li = document.createElement('li');
+      li.textContent = version + (version === current ? ' (current)' : '');
+      if (version !== current) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Rollback';
+        btn.style.marginLeft = '1em';
+        btn.onclick = async () => {
+          if (!confirm(`Rollback to deployment ${version}?`)) return;
+          btn.disabled = true;
+          btn.textContent = 'Rolling back...';
+          try {
+            await apiCall(`/api/deployments/rollback/${version}`, { method: 'POST' });
+            await fetchDeployments();
+            await fetchStatus();
+            alert(`Rolled back to ${version}`);
+          } catch (err) {
+            alert(`Failed to rollback: ${err.message}`);
+            console.debug('[Deployments] Rollback error:', err);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = 'Rollback';
+          }
+        };
+        li.appendChild(btn);
+      }
+      deploymentsList.appendChild(li);
+    });
+    console.debug('[Deployments] Rendered', { versions, current });
+  }
+
   // --- ENV Management ---
   async function fetchEnvs() {
     try {
@@ -213,6 +269,9 @@
 
   // --- Initialization ---
   function init() {
+    fetchDeployments();
+    setInterval(fetchDeployments, 10000); // Poll every 10s
+
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProto}//${location.host}`);
     ws.onmessage = (evt) => {
@@ -224,6 +283,8 @@
     fetchEnvs();
     setInterval(fetchStatus, 5000); // Poll less frequently
     fetchStatus();
+    // Also re-fetch deployments after upload or rollback
+  
   }
 
   // Log filter event

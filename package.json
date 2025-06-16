@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
-        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json --ignore __tests__",
+        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json --ignore __tests__ --ignore .upload_blacklist --ignore .upload_bearer",
         "test": "jest"
     },
     "dependencies": {

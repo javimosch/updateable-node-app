@@ -145,6 +145,21 @@ app.use((req, res, next) => {
 
 const upload = multer({ dest: uploadsDir });
 
+// --- Deployment Rotation Helper ---
+async function rotateDeployments() {
+  const entries = await fs.readdir(deploymentsDir, { withFileTypes: true });
+  const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+  dirs.sort((a, b) => b.localeCompare(a)); // Descending, newest first
+  if (dirs.length > 5) {
+    const toDelete = dirs.slice(5);
+    for (const dir of toDelete) {
+      const fullPath = path.join(deploymentsDir, dir);
+      await fs.rm(fullPath, { recursive: true, force: true });
+      console.debug(`[DeploymentRotation] Deleted old deployment: ${fullPath}`);
+    }
+  }
+}
+
 // --- API Routes ---
 
 app.post('/config', async (req, res) => {
@@ -188,6 +203,8 @@ function bearerAuth(req, res, next) {
 
 // Add bearerAuth middleware before upload.single for /upload
 app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
+  // On upload, deployment version is the deploymentPath's basename (timestamp)
+
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -220,6 +237,9 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
     console.log(`Unzipping ${zipPath} to ${deploymentPath}`);
     await extractZip(zipPath, deploymentPath);
     console.log('Unzip operation completed successfully.');
+
+    // Rotate deployments (keep only last 5)
+    await rotateDeployments();
 
     // Clean up the uploaded zip file
     await fs.unlink(zipPath);
@@ -273,6 +293,45 @@ app.post('/stop', (req, res) => {
     return res.status(400).json({ error: 'App not running' });
   }
   res.json({ message: 'App stopped' });
+});
+
+// --- Deployment Management Endpoints ---
+
+// List all deployments (sorted by newest first)
+app.get('/api/deployments', async (req, res) => {
+  try {
+    const entries = await fs.readdir(deploymentsDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+    dirs.sort((a, b) => b.localeCompare(a));
+    res.json(dirs);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not list deployments' });
+  }
+});
+
+// Get current deployment version (basename of config.basePath)
+app.get('/api/deployment/current', (req, res) => {
+  const current = config.basePath ? path.basename(config.basePath) : null;
+  res.json({ current });
+});
+
+// Rollback to a previous deployment
+app.post('/api/deployments/rollback/:version', async (req, res) => {
+  const { version } = req.params;
+  const targetPath = path.join(deploymentsDir, version);
+  try {
+    if (!fsSync.existsSync(targetPath)) {
+      return res.status(404).json({ error: 'Deployment version not found' });
+    }
+    stopApp();
+    config.basePath = targetPath;
+    config.lastUploadDate = new Date().toISOString();
+    await saveConfig();
+    await startApp();
+    res.json({ message: `Rolled back to deployment: ${version}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to rollback', details: err.message });
+  }
 });
 
 // --- API Routes for ENVs ---
