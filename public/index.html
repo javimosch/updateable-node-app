@@ -89,6 +89,25 @@
     </section>
 
     <section>
+      <h2>Environment Configurations</h2>
+      <div class="form-grid">
+        <label for="envSelect">Select/Manage Config:</label>
+        <select id="envSelect"></select>
+
+        <label for="envName">Config Name:</label>
+        <input type="text" id="envName" placeholder="e.g., production, test" />
+
+        <label for="envContent">.env Content:</label>
+        <textarea id="envContent" rows="8" placeholder="KEY=VALUE
+ANOTHER_KEY=another_value"></textarea>
+      </div>
+      <div id="envActions" style="margin-top: 1rem;">
+          <button id="saveEnvButton">Save</button>
+          <button id="deleteEnvButton">Delete</button>
+      </div>
+    </section>
+
+    <section>
       <h2>Logs</h2>
       <pre id="logs"></pre>
     </section>
