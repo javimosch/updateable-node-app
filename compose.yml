@@ -1,0 +1,11 @@
+services:
+  webui:
+    build: .
+    image: javimosch/updateable-node
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    command: ["npm", "run", "dev"]
