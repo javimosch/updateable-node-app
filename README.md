@@ -12,6 +12,7 @@ It's designed to be a lightweight and flexible solution for deploying and managi
 - **Versioned Deployments**: The container keeps the last 5 deployments, making it possible to implement rollbacks in the future.
 - **Real-time Logs**: View real-time `stdout` and `stderr` from your application in the web UI.
 - **Basic Authentication**: The web UI is protected by basic authentication.
+- **Environment Variable Management**: Configure and select different sets of environment variables for your application directly from the web UI.
 - **Interactive Upload Script**: An interactive `upload.sh` script to easily package and upload your applications.
 
 ## How to use
@@ -50,6 +51,7 @@ Open your browser and navigate to `http://localhost:3000`. You will be prompted 
 - **Upload App**: Upload a `.zip` file containing your Node.js application, including `node_modules`. The container will stop the current application, extract the new one, and start it.
 - **Status**: View the current status of the application (Running/Stopped) and the last upload date.
 - **Actions**: Start or stop the application manually.
+- **Environment Configurations**: Create, edit, delete, and select environment configurations. The selected configuration will be loaded into your application when it starts.
 - **Logs**: View real-time logs from your application.
 
 ### 5. Using the `upload.sh` script
@@ -80,8 +82,9 @@ The script will guide you through selecting a base path and a folder to zip and 
 - `package.json`: Dependencies for the web UI server.
 - `public/`: Static files for the web UI (HTML, CSS, JS).
 - `upload.sh`: Interactive script to upload applications.
-- `config.json` (generated): Stores the persistent configuration.
+- `config.json` (generated): Stores the persistent configuration (run command, selected env, etc.).
 - `deployments/` (generated): Stores the versioned deployments.
+- `env-configs/` (generated): Stores your `.env.*` configuration files.
 - `uploads/` (generated): Temporary directory for uploads.
 
 ## How it works
