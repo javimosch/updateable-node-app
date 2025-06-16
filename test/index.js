@@ -11,6 +11,6 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 
   setInterval(() => {
-    console.log('tick');
+    console.log('tick tak');
   }, 1000);
 });

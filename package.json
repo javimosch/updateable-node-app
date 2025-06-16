@@ -7,13 +7,12 @@
         "test": "jest"
     },
     "dependencies": {
+        "adm-zip": "^0.5.10",
         "dotenv": "^16.5.0",
         "express": "^4.18.2",
         "express-basic-auth": "^1.2.1",
         "multer": "^1.4.5-lts.1",
-        "unzipper": "^0.10.14",
-        "ws": "^8.14.2",
-        "adm-zip": "^0.5.10" // Moved from devDependencies for unzip.js production use
+        "ws": "^8.14.2"
     },
     "devDependencies": {
         "jest": "^29.7.0"

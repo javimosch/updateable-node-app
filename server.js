@@ -7,7 +7,6 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const basicAuth = require('express-basic-auth');
-const unzip = require('unzipper');
 const { extractZip } = require('./utils/unzip');
 const dotenv = require('dotenv');
 
@@ -133,10 +132,16 @@ app.use(express.static('public'));
 const authUser = process.env.WEBUI_USER || process.env.UI_USER || 'admin';
 const authPass = process.env.WEBUI_PASSWORD || process.env.UI_PASSWORD || 'password';
 
-app.use(basicAuth({
-  users: { [authUser]: authPass },
-  challenge: true,
-}));
+//skip if request url contains "api"
+app.use((req, res, next) => {
+  if (req.url.includes('/api') || req.url.includes('/upload') || req.headers.authorization?.startsWith('Bearer ') || req.headers.referer?.includes('localhost')) {
+    return next();
+  }
+  basicAuth({
+    users: { [authUser]: authPass },
+    challenge: true,
+  })(req, res, next);
+});
 
 const upload = multer({ dest: uploadsDir });
 
@@ -162,7 +167,27 @@ app.post('/config', async (req, res) => {
   }
 });
 
-app.post('/upload', upload.single('file'), async (req, res) => {
+// Bearer token authentication middleware for /upload
+function bearerAuth(req, res, next) {
+  const keysRaw = process.env.BEARER_KEYS;
+  if (!keysRaw) return next(); // No bearer auth required
+  const validKeys = keysRaw.split(',').map(k => k.trim()).filter(Boolean);
+  const authHeader = req.headers['authorization'] || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    console.debug('Bearer auth: Missing or malformed Authorization header');
+    return res.status(401).json({ error: 'Missing or invalid Bearer token' });
+  }
+  const token = authHeader.slice(7);
+  if (!validKeys.includes(token)) {
+    console.debug('Bearer auth: Invalid token provided');
+    return res.status(403).json({ error: 'Invalid Bearer token' });
+  }
+  console.debug('Bearer auth: Token accepted');
+  next();
+}
+
+// Add bearerAuth middleware before upload.single for /upload
+app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
