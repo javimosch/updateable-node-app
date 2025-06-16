@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
-        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json"
+        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json",
+        "test": "jest"
     },
     "dependencies": {
         "dotenv": "^16.5.0",
@@ -12,5 +13,9 @@
         "multer": "^1.4.5-lts.1",
         "unzipper": "^0.10.14",
         "ws": "^8.14.2"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0",
+        "adm-zip": "^0.5.10"
     }
 }

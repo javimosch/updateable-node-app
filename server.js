@@ -8,6 +8,7 @@ const fsSync = require('fs');
 const path = require('path');
 const basicAuth = require('express-basic-auth');
 const unzip = require('unzipper');
+const { extractZip } = require('./utils/unzip');
 const dotenv = require('dotenv');
 
 const app = express();
@@ -174,28 +175,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     await fs.mkdir(deploymentPath, { recursive: true });
     const zipPath = req.file.path;
 
-    // Unzip the file
+    // Unzip the file using shared utility
     console.log(`Unzipping ${zipPath} to ${deploymentPath}`);
-    await new Promise((resolve, reject) => {
-      const stream = fsSync.createReadStream(zipPath)
-        .pipe(unzip.Extract({ path: deploymentPath }));
-      
-      stream.on('finish', () => {
-        console.log('Unzip stream finished.');
-        resolve();
-      });
-      
-      stream.on('error', (err) => {
-        console.error('Unzip stream error:', err);
-        reject(new Error(`Failed to extract zip file: ${err.message}`));
-      });
-    }).catch(err => {
-      // This catch block is for the promise returned by new Promise()
-      // It will catch errors from reject() or any synchronous errors within the promise constructor
-      console.error('Promise catch for unzip operation:', err);
-      throw err; // Re-throw to be caught by the outer try-catch
-    });
-    console.log('Unzip operation completed (promise resolved/rejected).');
+    await extractZip(zipPath, deploymentPath);
+    console.log('Unzip operation completed successfully.');
 
     // Clean up the uploaded zip file
     await fs.unlink(zipPath);
