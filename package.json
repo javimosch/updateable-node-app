@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
-        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json",
+        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json --ignore __tests__",
         "test": "jest"
     },
     "dependencies": {
@@ -12,10 +12,10 @@
         "express-basic-auth": "^1.2.1",
         "multer": "^1.4.5-lts.1",
         "unzipper": "^0.10.14",
-        "ws": "^8.14.2"
+        "ws": "^8.14.2",
+        "adm-zip": "^0.5.10" // Moved from devDependencies for unzip.js production use
     },
     "devDependencies": {
-        "jest": "^29.7.0",
-        "adm-zip": "^0.5.10"
+        "jest": "^29.7.0"
     }
 }

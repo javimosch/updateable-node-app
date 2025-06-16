@@ -4,3 +4,4 @@ uploads
 config.json
 deployments
 env-configs
+.upload_blacklist

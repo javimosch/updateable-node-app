@@ -175,6 +175,22 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     await fs.mkdir(deploymentPath, { recursive: true });
     const zipPath = req.file.path;
 
+    // Check uploaded file size and magic header before unzipping
+    const stat = await fs.stat(zipPath);
+    console.log('Uploaded zip file size:', stat.size);
+    if (stat.size < 4) {
+      return res.status(400).json({ error: 'Uploaded file is too small to be a valid zip.' });
+    }
+    const fd = await fs.open(zipPath, 'r');
+    const headerBuf = Buffer.alloc(4);
+    await fd.read(headerBuf, 0, 4, 0);
+    await fd.close();
+    const magic = headerBuf.toString('hex');
+    console.log('Zip file magic header:', magic);
+    // ZIP files start with 504b0304 or 504b0506 or 504b0708
+    if (!['504b0304', '504b0506', '504b0708'].includes(magic)) {
+      return res.status(400).json({ error: 'Uploaded file is not a valid zip archive.' });
+    }
     // Unzip the file using shared utility
     console.log(`Unzipping ${zipPath} to ${deploymentPath}`);
     await extractZip(zipPath, deploymentPath);
