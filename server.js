@@ -18,10 +18,10 @@ const wss = new WebSocket.Server({ server });
 console.debug('Server and WebSocket server created');
 
 const port = process.env.PORT||3888;
-const uploadsDir = path.join(__dirname, 'uploads');
-const deploymentsDir = path.join(__dirname, 'deployments');
-const envsDir = path.join(__dirname, 'env-configs');
-const configPath = path.join(__dirname, 'config.json');
+const uploadsDir = path.join(__dirname,'data', 'uploads');
+const deploymentsDir = path.join(__dirname, 'data', 'deployments');
+const envsDir = path.join(__dirname, 'data', 'env-configs');
+const configPath = path.join(__dirname, 'data', 'config.json');
 
 // --- Configuration ---
 let config = {

@@ -7,3 +7,4 @@ env-configs
 .upload_blacklist
 .upload_bearer
 .upload_url
+data

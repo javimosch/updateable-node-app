@@ -361,19 +361,6 @@
     }
   });
 
-  // Add normalization for env content textarea
-  envContentArea.addEventListener('input', (e) => {
-    const cursorPosition = e.target.selectionStart;
-    const originalValue = e.target.value;
-    const normalizedValue = originalValue.toUpperCase();
-    
-    if (originalValue !== normalizedValue) {
-      e.target.value = normalizedValue;
-      // Restore cursor position
-      e.target.setSelectionRange(cursorPosition, cursorPosition);
-      console.debug('[EnvContent] Normalized to uppercase', { original: originalValue, normalized: normalizedValue });
-    }
-  });
 
   // --- Initialization ---
   function init() {
