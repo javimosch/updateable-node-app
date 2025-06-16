@@ -141,7 +141,10 @@
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ command: commandInput.value }),
   }).then(fetchStatus).catch(alert));
-  stopButton.addEventListener('click', () => apiCall('/stop').then(fetchStatus).catch(alert));
+  stopButton.addEventListener('click', () => apiCall('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  }).then(fetchStatus).catch(alert));
 
   // ENV Listeners
   envSelect.addEventListener('change', async () => {
