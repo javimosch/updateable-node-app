@@ -1,5 +1,10 @@
 {
-    "name": "webui",
+    "name": "updateable-node-app",
+    "description": "A lightweight and flexible Docker container for running Node.js applications with a web UI and command-line script for easy updates, version rollback, and environment management",
+    "author": {
+        "name": "Javier Leandro Arancibia",
+        "url": "https://github.com/javimosch"
+    },
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
