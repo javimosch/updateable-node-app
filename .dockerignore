@@ -1,0 +1,14 @@
+deployments
+env-configs
+config.json
+uploads
+__tests__
+.upload_blacklist
+.upload_bearer
+.env
+Dockerfile
+README.md
+upload.sh
+compose.yml
+jest.config.js
+.commiat
