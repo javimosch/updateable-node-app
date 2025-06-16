@@ -1,0 +1,12 @@
+services:
+  app:
+    image: javimosch/updateable-node
+    volumes:
+      - app-volume:/app
+    expose:
+      - "3888"
+      - "3000"
+    command: ["npm", "run", "start"]
+
+volumes:
+  app-volume:

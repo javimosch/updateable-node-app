@@ -35,6 +35,7 @@
 
   let currentEnvs = [];
   let selectedEnvFromServer = null;
+  let isCreatingNewEnv = false; // Track when user is creating new env
 
   // --- UI Helper Functions ---
   function showToast(message, type = 'info') {
@@ -175,18 +176,31 @@
       option.textContent = name;
       envSelect.appendChild(option);
     });
-    envSelect.value = selectedEnvFromServer || (currentEnvs.includes(currentVal) ? currentVal : '');
+    // Preserve "[Create New]" selection or use server selection
+    if (isCreatingNewEnv) {
+      envSelect.value = '__new__';
+    } else {
+      envSelect.value = selectedEnvFromServer || (currentEnvs.includes(currentVal) ? currentVal : '');
+    }
     handleEnvSelection();
   }
 
   async function handleEnvSelection() {
     const selected = envSelect.value;
     if (selected === '__new__') {
-      envNameInput.value = '';
-      envContentArea.value = '';
+      isCreatingNewEnv = true;
+      // Only clear inputs if they're empty or this is a direct user selection change
+      // Don't clear if user is actively typing (preserve existing values)
+      if (!envNameInput.value.trim()) {
+        envNameInput.value = '';
+      }
+      if (!envContentArea.value.trim()) {
+        envContentArea.value = '';
+      }
       envNameInput.readOnly = false;
       deleteEnvButton.hidden = true;
     } else if (selected) {
+      isCreatingNewEnv = false;
       try {
         const data = await apiCall(`/api/envs/${selected}`);
         envNameInput.value = data.name;
@@ -197,6 +211,7 @@
         showToast(`Error loading env: ${err.message}`, 'error');
       }
     } else {
+      isCreatingNewEnv = false;
       envNameInput.value = '';
       envContentArea.value = '';
       envNameInput.readOnly = true;
@@ -294,6 +309,7 @@
   envSelect.addEventListener('change', async () => {
     const selected = envSelect.value;
     if (selected !== '__new__') {
+      isCreatingNewEnv = false;
       try {
         await apiCall('/config', {
           method: 'POST',
@@ -322,6 +338,7 @@
       });
       showToast('Environment config saved.', 'success');
       selectedEnvFromServer = name;
+      isCreatingNewEnv = false; // Reset after saving
       await fetchEnvs();
     } catch (err) {
       showToast(`Error saving env: ${err.message}`, 'error');
@@ -337,9 +354,24 @@
       envNameInput.value = '';
       envContentArea.value = '';
       selectedEnvFromServer = null;
+      isCreatingNewEnv = false; // Reset after deleting
       await fetchEnvs();
     } catch (err) {
       showToast(`Error deleting env: ${err.message}`, 'error');
+    }
+  });
+
+  // Add normalization for env content textarea
+  envContentArea.addEventListener('input', (e) => {
+    const cursorPosition = e.target.selectionStart;
+    const originalValue = e.target.value;
+    const normalizedValue = originalValue.toUpperCase();
+    
+    if (originalValue !== normalizedValue) {
+      e.target.value = normalizedValue;
+      // Restore cursor position
+      e.target.setSelectionRange(cursorPosition, cursorPosition);
+      console.debug('[EnvContent] Normalized to uppercase', { original: originalValue, normalized: normalizedValue });
     }
   });
 
