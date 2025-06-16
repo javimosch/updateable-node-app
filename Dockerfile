@@ -14,6 +14,7 @@ RUN npm install
 
 # Expose the port for the web UI
 EXPOSE 3888
+EXPOSE 3000
 
 # Run the web UI server
 CMD ["node", "server.js"]

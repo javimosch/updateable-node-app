@@ -8,7 +8,15 @@ if [ "$1" == "--debug" ]; then
 fi
 
 # Default values
-URL=${3:-http://localhost:3888/upload}
+URL_FILE=".upload_url"
+URL_DEFAULT="http://localhost:3888/upload"
+
+# Load URL from file if exists, otherwise use default
+if [ -f "$URL_FILE" ]; then
+  URL=$(cat "$URL_FILE")
+else
+  URL="$URL_DEFAULT"
+fi
 BLACKLIST_FILE=".upload_blacklist"
 BEARER_FILE=".upload_bearer"
 BEARER_TOKEN=""
@@ -57,6 +65,7 @@ set_upload_url() {
   
   if [ -n "$new_url" ]; then
     URL="$new_url"
+    echo "$URL" > "$URL_FILE"
     echo "Upload URL updated to: $URL"
   fi
   read -p "Press Enter to continue..."
@@ -125,6 +134,20 @@ clear_bearer_token() {
   BEARER_TOKEN=""
   rm -f "$BEARER_FILE"
   echo "Bearer token cleared."
+  read -p "Press Enter to continue..."
+}
+
+# Function to reset upload URL
+reset_upload_url() {
+  show_header
+  echo "Resetting upload URL..."
+  if [ -f "$URL_FILE" ]; then
+    rm "$URL_FILE"
+    URL="$URL_DEFAULT"
+    echo "Upload URL reset to default: $URL"
+  else
+    echo "Upload URL is already at default."
+  fi
   read -p "Press Enter to continue..."
 }
 
@@ -298,7 +321,8 @@ while true; do
   echo "4. Manage blacklist"
   echo "5. Set Bearer token"
   echo "6. Clear Bearer token"
-  echo "7. Exit"
+  echo "7. Reset Server URL"
+  echo "8. Exit"
   echo ""
   read -p "Enter your choice: " choice
   
@@ -309,7 +333,8 @@ while true; do
     4) manage_blacklist ;;
     5) set_bearer_token ;;
     6) clear_bearer_token ;;
-    7) exit 0 ;;
+    7) reset_upload_url ;;
+    8) exit 0 ;;
     *) echo "Invalid choice"; read -p "Press Enter to continue..." ;;
   esac
 done
