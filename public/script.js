@@ -8,6 +8,21 @@
   const statusDiv = document.getElementById('status');
   const lastUploadSpan = document.getElementById('lastUpload');
   const logsPre = document.getElementById('logs');
+  const logFilterInput = document.getElementById('logFilter');
+  const clearLogsButton = document.getElementById('clearLogsButton');
+
+  // Store all log lines
+  let allLogs = [];
+
+  function renderLogs() {
+    const filter = logFilterInput?.value?.toLowerCase() || '';
+    const filtered = filter
+      ? allLogs.filter(line => line.toLowerCase().includes(filter))
+      : allLogs;
+    logsPre.textContent = filtered.join('');
+    logsPre.scrollTop = logsPre.scrollHeight;
+    console.debug('[Logs] Rendered', { filter, count: filtered.length });
+  }
   const progressEl = document.getElementById('uploadProgress');
   const startButton = document.getElementById('startButton');
   const stopButton = document.getElementById('stopButton');
@@ -201,14 +216,28 @@
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProto}//${location.host}`);
     ws.onmessage = (evt) => {
-      logsPre.textContent += evt.data;
-      logsPre.scrollTop = logsPre.scrollHeight;
+      allLogs.push(evt.data);
+      renderLogs();
+      console.debug('[Logs] Received message', evt.data);
     };
 
     fetchEnvs();
     setInterval(fetchStatus, 5000); // Poll less frequently
     fetchStatus();
   }
+
+  // Log filter event
+  logFilterInput?.addEventListener('input', () => {
+    renderLogs();
+    console.debug('[Logs] Filter input', logFilterInput?.value);
+  });
+
+  // Clear logs event
+  clearLogsButton?.addEventListener('click', () => {
+    allLogs = [];
+    renderLogs();
+    console.debug('[Logs] Cleared');
+  });
 
   init();
 })();
