@@ -5,7 +5,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "3000:3000"
+      - "3888:3888"
     env_file:
       - .env
     command: ["npm", "run", "dev"]

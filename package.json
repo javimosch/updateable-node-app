@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
-        "dev": "npx nodemon server.js"
+        "dev": "npx nodemon server.js --ignore deployments --ignore env-configs --ignore config.json"
     },
     "dependencies": {
         "dotenv": "^16.5.0",
