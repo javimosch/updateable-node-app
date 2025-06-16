@@ -184,6 +184,12 @@ app.post('/config', async (req, res) => {
 
 // Bearer token authentication middleware for /upload
 function bearerAuth(req, res, next) {
+
+  //if referrer is localhost, let it pass
+  if (req.headers.referer?.includes('localhost')) {
+    return next();
+  }
+
   const keysRaw = process.env.BEARER_KEYS;
   if (!keysRaw) return next(); // No bearer auth required
   const validKeys = keysRaw.split(',').map(k => k.trim()).filter(Boolean);
