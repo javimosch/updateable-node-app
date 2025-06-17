@@ -119,7 +119,12 @@
         apiCall('/api/deployments'),
         apiCall('/api/deployment/current'),
       ]);
-      renderDeployments(versions, currentObj.current);
+      // Convert versions to deployment objects with formatted date
+      const deployments = versions.map(version => ({
+        version,
+        date: formatVersionToDate(version)
+      }));
+      renderDeployments(deployments, currentObj.current);
     } catch (err) {
       deploymentsList.innerHTML = '<li class="text-error">Failed to load deployments</li>';
       currentDeploymentSpan.textContent = 'N/A';
@@ -128,26 +133,61 @@
     }
   }
 
-  function renderDeployments(versions, current) {
+  // Helper function to format deployment version string to human-readable date
+  function formatVersionToDate(version) {
+    try {
+      //Assume version = 2025-06-17T13-53-57-029Z
+      
+
+      //First split by T
+      const [datePart, timePart] = version.split('T');
+      if (!timePart) return version;
+
+      //I want to render DD/MM/YYYY HH:mm:ss
+      const [year, month, day] = datePart.split('-');
+      const [hours, minutes, seconds] = timePart.split('-');
+      return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    } catch (err) {
+      console.error('Failed to format version:', version, err);
+      return version;
+    }
+  }
+
+  function renderDeployments(deployments, current) {
+    let currentFormatted = formatVersionToDate(current);
     deploymentsList.innerHTML = '';
-    currentDeploymentSpan.textContent = current || 'N/A';
-    currentDeploymentText.textContent = current || 'N/A';
-    
-    if (!versions?.length) {
+    currentDeploymentSpan.textContent = currentFormatted || 'N/A';
+    currentDeploymentText.textContent = currentFormatted || 'N/A';
+
+    if (!deployments?.length) {
       deploymentsList.innerHTML = '<li class="text-base-content/60">No deployments found</li>';
       return;
     }
-    
-    versions.forEach(version => {
+
+    deployments.forEach(deployment => {
+      const { version, date } = deployment;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-base-200 rounded-lg';
-      
-      const versionSpan = document.createElement('span');
-      versionSpan.textContent = version;
-      versionSpan.className = version === current ? 'font-bold text-primary' : '';
-      
-      li.appendChild(versionSpan);
-      
+
+      // Version and date container
+      const versionContainer = document.createElement('div');
+      versionContainer.className = 'flex flex-col';
+
+      const dateDiv = document.createElement('div');
+      dateDiv.textContent = date;
+      if (version === current) {
+        dateDiv.className = 'font-bold text-primary';
+      }
+
+      const versionDiv = document.createElement('div');
+      versionDiv.textContent = version;
+      versionDiv.className = 'text-xs opacity-75';
+
+      versionContainer.appendChild(dateDiv);
+      versionContainer.appendChild(versionDiv);
+
+      li.appendChild(versionContainer);
+
       if (version !== current) {
         const btn = document.createElement('button');
         btn.className = 'btn btn-sm btn-outline btn-secondary';
@@ -176,10 +216,10 @@
         badge.textContent = 'Current';
         li.appendChild(badge);
       }
-      
+
       deploymentsList.appendChild(li);
     });
-    console.debug('[Deployments] Rendered', { versions, current });
+    console.debug('[Deployments] Rendered', { deployments, current });
   }
 
   // --- ENV Management ---
