@@ -6,7 +6,7 @@ services:
       - .:/app
     ports:
       - "3888:3888"
-      - "3089:3000"
+      - "3889:3000"
     env_file:
       - .env
     command: ["npm", "run", "dev"]
