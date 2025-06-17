@@ -36,6 +36,17 @@
   let currentEnvs = [];
   let selectedEnvFromServer = null;
   let isCreatingNewEnv = false; // Track when user is creating new env
+  let isEditingEnvContent = false; // Track when user is editing envContent
+
+  // --- ENV Content Editing State ---
+  envContentArea.addEventListener('focus', () => {
+    isEditingEnvContent = true;
+    console.debug('[EnvContent] Editing started');
+  });
+  envContentArea.addEventListener('blur', () => {
+    isEditingEnvContent = false;
+    console.debug('[EnvContent] Editing ended');
+  });
 
   // --- UI Helper Functions ---
   function showToast(message, type = 'info') {
@@ -213,7 +224,12 @@
       try {
         const data = await apiCall(`/api/envs/${selected}`);
         envNameInput.value = data.name;
-        envContentArea.value = data.content;
+        if (!isEditingEnvContent) {
+          envContentArea.value = data.content;
+          console.debug('[EnvContent] Updated from server', data.content);
+        } else {
+          console.debug('[EnvContent] Skipped update, user editing');
+        }
         envNameInput.readOnly = true;
         deleteEnvButton.hidden = false;
       } catch (err) {
@@ -222,7 +238,12 @@
     } else {
       isCreatingNewEnv = false;
       envNameInput.value = '';
-      envContentArea.value = '';
+      if (!isEditingEnvContent) {
+        envContentArea.value = '';
+        console.debug('[EnvContent] Cleared');
+      } else {
+        console.debug('[EnvContent] Skipped clear, user editing');
+      }
       envNameInput.readOnly = true;
       deleteEnvButton.hidden = true;
     }
