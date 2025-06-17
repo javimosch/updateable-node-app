@@ -8,6 +8,7 @@ const fsSync = require('fs');
 const path = require('path');
 const basicAuth = require('express-basic-auth');
 const { extractZip } = require('./utils/unzip');
+const { backupPersistentFolders, restorePersistentFolders } = require('./utils/persistentFolders');
 const dotenv = require('dotenv');
 
 const app = express();
@@ -21,6 +22,7 @@ const port = process.env.PORT||3888;
 const uploadsDir = path.join(__dirname,'data', 'uploads');
 const deploymentsDir = path.join(__dirname, 'data', 'deployments');
 const envsDir = path.join(__dirname, 'data', 'env-configs');
+const persistentDir = path.join(__dirname, 'data', 'persistent');
 const configPath = path.join(__dirname, 'data', 'config.json');
 
 // --- Configuration ---
@@ -29,6 +31,7 @@ let config = {
   basePath: null,
   lastUploadDate: null,
   selectedEnv: null,
+  persistentFoldersUI: null, // UI configuration for persistent folders (comma-separated string)
 };
 
 async function loadConfig() {
@@ -163,7 +166,7 @@ async function rotateDeployments() {
 // --- API Routes ---
 
 app.post('/config', async (req, res) => {
-  const { command, selectedEnv } = req.body;
+  const { command, selectedEnv, persistentFoldersUI } = req.body;
   let updated = false;
   if (typeof command !== 'undefined') {
     config.command = command;
@@ -172,6 +175,11 @@ app.post('/config', async (req, res) => {
   if (typeof selectedEnv !== 'undefined') {
     config.selectedEnv = selectedEnv || null; // Allow unsetting
     updated = true;
+  }
+  if (typeof persistentFoldersUI !== 'undefined') {
+    config.persistentFoldersUI = persistentFoldersUI || null; // Allow unsetting
+    updated = true;
+    console.debug(`Updated persistentFoldersUI: ${persistentFoldersUI}`);
   }
 
   if (updated) {
@@ -216,6 +224,12 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
   }
 
   stopApp();
+  
+  // Backup persistent folders from current deployment before starting the new one
+  if (config.basePath) {
+    console.debug('Backing up persistent folders from current deployment');
+    await backupPersistentFolders(config.basePath, persistentDir, config);
+  }
 
   const deploymentPath = path.join(deploymentsDir, new Date().toISOString().replace(/[:.]/g, '-'));
 
@@ -273,6 +287,11 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
     config.basePath = deploymentPath;
     config.lastUploadDate = new Date().toISOString();
     await saveConfig();
+    
+    // Restore persistent folders to the new deployment
+    console.debug('Restoring persistent folders to new deployment');
+    await restorePersistentFolders(deploymentPath, persistentDir, config);
+    
     await startApp();
 
     res.json({ message: 'Upload successful, app started.' });
@@ -329,10 +348,23 @@ app.post('/api/deployments/rollback/:version', async (req, res) => {
     if (!fsSync.existsSync(targetPath)) {
       return res.status(404).json({ error: 'Deployment version not found' });
     }
+    
     stopApp();
+    
+    // Backup persistent folders from the current deployment before rolling back
+    if (config.basePath) {
+      console.debug('Backing up persistent folders before rollback');
+      await backupPersistentFolders(config.basePath, persistentDir, config);
+    }
+    
     config.basePath = targetPath;
     config.lastUploadDate = new Date().toISOString();
     await saveConfig();
+    
+    // Restore persistent folders to the rollback deployment
+    console.debug('Restoring persistent folders to rollback deployment');
+    await restorePersistentFolders(targetPath, persistentDir, config);
+    
     await startApp();
     res.json({ message: `Rolled back to deployment: ${version}` });
   } catch (err) {
@@ -414,7 +446,7 @@ async function main() {
     console.debug('Starting server initialization...');
     
     // Create essential directories
-    for (const dir of [uploadsDir, deploymentsDir, envsDir]) {
+    for (const dir of [uploadsDir, deploymentsDir, envsDir, persistentDir]) {
       if (!fsSync.existsSync(dir)) {
         console.debug(`Creating directory: ${dir}`);
         fsSync.mkdirSync(dir, { recursive: true });

@@ -2,6 +2,7 @@
   // --- DOM Elements ---
   const commandInput = document.getElementById('command');
   const basePathInput = document.getElementById('basePath');
+  const persistentFoldersInput = document.getElementById('persistentFolders');
   const configForm = document.getElementById('configForm');
   const uploadForm = document.getElementById('uploadForm');
   const fileInput = document.getElementById('fileInput');
@@ -60,14 +61,17 @@
     setTimeout(() => toast.remove(), 3000);
   }
 
-  // Track user editing state for command/basePath
+  // Track user editing state for command/basePath/persistentFolders
   let isEditingCommand = false;
   let isEditingBasePath = false;
+  let isEditingPersistentFolders = false;
 
   commandInput.addEventListener('focus', () => { isEditingCommand = true; });
   commandInput.addEventListener('blur', () => { isEditingCommand = false; });
   basePathInput.addEventListener('focus', () => { isEditingBasePath = true; });
   basePathInput.addEventListener('blur', () => { isEditingBasePath = false; });
+  persistentFoldersInput.addEventListener('focus', () => { isEditingPersistentFolders = true; });
+  persistentFoldersInput.addEventListener('blur', () => { isEditingPersistentFolders = false; });
 
   function updateStatusBadge(running) {
     statusDiv.className = running ? 'stat-value text-lg text-success' : 'stat-value text-lg text-error';
@@ -93,6 +97,7 @@
       stopButton.hidden = !data.running;
       if (!isEditingCommand) commandInput.value = data.command;
       if (!isEditingBasePath) basePathInput.value = data.basePath || 'N/A';
+      if (!isEditingPersistentFolders) persistentFoldersInput.value = data.persistentFoldersUI || '';
       lastUploadSpan.textContent = data.lastUploadDate ? new Date(data.lastUploadDate).toLocaleString() : 'N/A';
       selectedEnvFromServer = data.selectedEnv;
       updateEnvDropdown();
@@ -258,11 +263,15 @@
       await apiCall('/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: commandInput.value }),
+        body: JSON.stringify({ 
+          command: commandInput.value,
+          persistentFoldersUI: persistentFoldersInput.value
+        }),
       });
-      showToast('Configuration saved successfully', 'success');
+      showToast('Configuration saved', 'success');
+      fetchStatus();
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(`Error saving config: ${err.message}`, 'error');
     }
   });
 
