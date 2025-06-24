@@ -1,3 +1,7 @@
+const dotenv = require('dotenv');
+
+dotenv.config()
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -9,7 +13,7 @@ const path = require('path');
 const basicAuth = require('express-basic-auth');
 const { extractZip } = require('./utils/unzip');
 const { backupPersistentFolders, restorePersistentFolders } = require('./utils/persistentFolders');
-const dotenv = require('dotenv');
+
 
 const app = express();
 const server = http.createServer(app);
@@ -130,21 +134,31 @@ function stopApp() {
 
 // --- Middleware ---
 app.use(express.json());
-app.use(express.static('public'));
 
 const authUser = process.env.WEBUI_USER || process.env.UI_USER || 'admin';
 const authPass = process.env.WEBUI_PASSWORD || process.env.UI_PASSWORD || 'password';
 
-//skip if request url contains "api"
+// Basic auth middleware - applied to all routes except specific bypasses
 app.use((req, res, next) => {
-  if (req.url.includes('/api') || req.url.includes('/upload') || req.headers.authorization?.startsWith('Bearer ') || req.headers.referer?.includes('localhost')) {
+  // Skip auth for upload endpoint (has its own Bearer auth)
+  if (req.url === '/upload') {
     return next();
   }
+  
+  // Skip auth if request has valid Bearer token
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return next();
+  }
+  
+  // Apply basic auth to all other requests
   basicAuth({
     users: { [authUser]: authPass },
     challenge: true,
   })(req, res, next);
 });
+
+// Serve static files AFTER authentication
+app.use(express.static('public'));
 
 const upload = multer({ dest: uploadsDir });
 
@@ -192,14 +206,9 @@ app.post('/config', async (req, res) => {
 
 // Bearer token authentication middleware for /upload
 function bearerAuth(req, res, next) {
-
-  //if referrer is localhost, let it pass
-  if (req.headers.referer?.includes('localhost')) {
-    return next();
-  }
-
   const keysRaw = process.env.BEARER_KEYS;
   if (!keysRaw) return next(); // No bearer auth required
+  
   const validKeys = keysRaw.split(',').map(k => k.trim()).filter(Boolean);
   const authHeader = req.headers['authorization'] || '';
   if (!authHeader.startsWith('Bearer ')) {
