@@ -104,3 +104,22 @@ You can configure persistent folders in two ways:
   3. If the new deployment package (zip file) contains any of the persistent folders, they are removed before restoring from the backup to avoid conflicts.
 
 - **Note**: The `/data/persistent` directory is created automatically and is not part of any deployment. It is solely used for storing the persistent folders during transitions.
+
+## Handling Large Projects with node_modules
+
+For projects with large dependencies (like React apps), follow this workaround to avoid uploading the heavy `node_modules` folder:
+
+1. **Exclude node_modules** from your deployment zip file
+2. **Upload** your application code without node_modules
+3. **Set the startup commands** in this order:
+   ```
+   npm install
+   npm run start
+   ```
+
+This will:
+- Keep your deployment package small
+- Automatically install dependencies when the container starts
+- Ensure all required dependencies are present before launching the app
+
+For custom scripts, replace with your package.json scripts (e.g. `npm run build` before `npm run start` for React apps)
