@@ -329,8 +329,6 @@ async function startLogStreamingInteractive(appFolder, options) {
     console.log(chalk.gray('----------------------------------------'));
 
     return new Promise((resolve) => {
-      let reconnectAttempts = 0;
-      const maxReconnectAttempts = options.follow ? 5 : 0;
       let ws = null;
 
       // Set up Ctrl+C handler for returning to main menu
@@ -357,9 +355,6 @@ async function startLogStreamingInteractive(appFolder, options) {
       function connectToLogs() {
         ws = api.connectToLogs(
           (message) => {
-            // Reset reconnect attempts on successful message
-            reconnectAttempts = 0;
-            
             // Apply syntax highlighting and formatting
             const formattedMessage = formatLogMessage(message, options);
             if (formattedMessage) {
@@ -368,23 +363,10 @@ async function startLogStreamingInteractive(appFolder, options) {
           },
           (error) => {
             ui.logError(`WebSocket error: ${error.message}`);
-            if (options.follow && reconnectAttempts < maxReconnectAttempts) {
-              reconnectAttempts++;
-              ui.logInfo(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
-              setTimeout(connectToLogs, 2000); // Retry after 2 seconds
-            } else {
-              handleSigint(); // Return to main menu
-            }
+            ui.logInfo('Connection lost. Press Ctrl+C to return to main menu.');
           },
           () => {
-            if (options.follow && reconnectAttempts < maxReconnectAttempts) {
-              reconnectAttempts++;
-              ui.logInfo(`Connection closed. Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
-              setTimeout(connectToLogs, 2000); // Retry after 2 seconds
-            } else {
-              ui.logInfo('Log stream ended');
-              handleSigint(); // Return to main menu
-            }
+            ui.logInfo('Log stream ended. Press Ctrl+C to return to main menu.');
           }
         );
       }
