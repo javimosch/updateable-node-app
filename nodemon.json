@@ -1,0 +1,24 @@
+{
+  "watch": [
+    "."
+  ],
+  "ignore": [
+    "deployments/",
+    "env-configs/",
+    "config.json",
+    "__tests__/",
+    ".upload_blacklist",
+    ".upload_bearer",
+    "persistent/",
+    "test/",
+    "uploads/",
+    "data/",
+    "tmp_code_*.*",
+    "node_modules/"
+  ],
+  "ext": "js,json",
+  "verbose": true,
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

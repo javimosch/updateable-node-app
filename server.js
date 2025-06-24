@@ -14,6 +14,46 @@ const basicAuth = require('express-basic-auth');
 const { extractZip } = require('./utils/unzip');
 const { backupPersistentFolders, restorePersistentFolders } = require('./utils/persistentFolders');
 
+// Function to restart the application (handles both nodemon and production environments)
+function restartApplication() {
+  console.log('=== Restart Application Debug ===');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('npm_lifecycle_event:', process.env.npm_lifecycle_event);
+  console.log('process.argv:', process.argv);
+  console.log('process.title:', process.title);
+  console.log('process.env._:', process.env._);
+  console.log('process.pid:', process.pid);
+  console.log('process.ppid:', process.ppid);
+  
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (!isProduction) {
+    console.log('Non-production environment detected, trying nodemon SIGUSR2 restart...');
+    
+    try {
+      // Try to signal nodemon directly with SIGUSR2
+      // This is the cleanest way to restart nodemon from within the app
+      console.log('Sending SIGUSR2 signal to restart nodemon...');
+      process.kill(process.pid, 'SIGUSR2');
+      
+      console.log('SIGUSR2 signal sent successfully');
+      
+      // Fallback to process.exit after a short delay if SIGUSR2 doesn't work
+      setTimeout(() => {
+        console.log('SIGUSR2 restart timeout reached, falling back to process.exit()...');
+        process.exit(1);
+      }, 3000); // 3 second timeout
+      
+    } catch (err) {
+      console.error('Failed to send SIGUSR2 signal:', err.message);
+      console.log('Falling back to process.exit()...');
+      process.exit(1);
+    }
+  } else {
+    console.log('Production environment detected, using process.exit()...');
+    process.exit(1);
+  }
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +61,19 @@ const wss = new WebSocket.Server({ server });
 
 // Debug server setup
 console.debug('Server and WebSocket server created');
+
+// Debug startup environment
+console.log('=== Startup Environment Debug ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('npm_lifecycle_event:', process.env.npm_lifecycle_event);
+console.log('process.argv:', process.argv);
+console.log('process.title:', process.title);
+console.log('process.env._:', process.env._);
+console.log('NODEMON_WATCHING:', process.env.NODEMON_WATCHING);
+
+// Using SIGUSR2 signal for nodemon restart - no file cleanup needed
+
+console.log('================================');
 
 const port = process.env.PORT||3888;
 
@@ -244,11 +297,75 @@ async function startApp() {
   });
 }
 
-function stopApp() {
+async function stopApp() {
   if (appProcess) {
     console.log('Stopping app...');
+    
+    // Broadcast stopping message to UI
+    const broadcast = (data) => {
+      const message = data.toString();
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    };
+    
+    broadcast(`[SYSTEM] Stopping previous application (PID: ${appProcess.pid})...\n`);
+    
+    // Create a promise that resolves when the process exits
+    const processExitPromise = new Promise((resolve) => {
+      appProcess.once('close', (code) => {
+        console.log(`Previous app process exited with code ${code}`);
+        broadcast(`[SYSTEM] Previous application stopped (exit code: ${code})\n`);
+        resolve();
+      });
+    });
+    
+    // Create a timeout promise for graceful shutdown
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        console.log('Process did not exit gracefully within 10 seconds, forcing termination...');
+        broadcast(`[SYSTEM] Process did not exit gracefully, forcing termination...\n`);
+        if (appProcess && !appProcess.killed) {
+          appProcess.kill('SIGKILL');
+        }
+        resolve();
+      }, 10000); // 10 second timeout
+    });
+    
+    // Create a failsafe promise for complete restart if SIGKILL fails
+    const failsafePromise = new Promise((resolve) => {
+      setTimeout(() => {
+        console.log('CRITICAL: Process still running after SIGKILL, restarting main application...');
+        broadcast(`[SYSTEM] CRITICAL: Subprocess failed to terminate. Restarting main application...\n`);
+        broadcast(`[SYSTEM] UI will refresh automatically in 3 seconds...\n`);
+        
+        // Tell UI to refresh after a short delay
+        setTimeout(() => {
+          broadcast(`[REFRESH]`); // Special message to trigger UI refresh
+        }, 3000);
+        
+        // Restart the main application after giving UI time to receive the message
+        setTimeout(() => {
+          console.log('Restarting main application due to stuck subprocess...');
+          restartApplication();
+        }, 4000);
+        
+        resolve();
+      }, 15000); // 15 second total timeout (5 seconds after SIGKILL)
+    });
+    
+    // Send termination signal
     appProcess.kill('SIGTERM');
-    appProcess = null;
+    
+    // Wait for process to exit, timeout, or failsafe
+    await Promise.race([processExitPromise, timeoutPromise, failsafePromise]);
+    
+    // Only set to null if process actually exited (not if we're restarting)
+    if (appProcess && appProcess.killed) {
+      appProcess = null;
+    }
     return true;
   }
   return false;
@@ -354,7 +471,7 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  stopApp();
+  await stopApp();
   
   // Backup persistent folders from current deployment before starting the new one
   if (config.basePath) {
@@ -444,11 +561,26 @@ app.post('/start', async (req, res) => {
   res.json({ message: 'App started' });
 });
 
-app.post('/stop', (req, res) => {
-  if (!stopApp()) {
+app.post('/stop', async (req, res) => {
+  if (!(await stopApp())) {
     return res.status(400).json({ error: 'App not running' });
   }
   res.json({ message: 'App stopped' });
+});
+
+// Test endpoint to trigger restart mechanism (development only)
+app.post('/test-restart', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Test endpoint not available in production' });
+  }
+  
+  res.json({ message: 'Triggering restart test...' });
+  
+  // Trigger restart after sending response
+  setTimeout(() => {
+    console.log('TEST: Triggering restart mechanism...');
+    restartApplication();
+  }, 1000);
 });
 
 // --- Deployment Management Endpoints ---
@@ -480,7 +612,7 @@ app.post('/api/deployments/rollback/:version', async (req, res) => {
       return res.status(404).json({ error: 'Deployment version not found' });
     }
     
-    stopApp();
+    await stopApp();
     
     // Backup persistent folders from the current deployment before rolling back
     if (config.basePath) {

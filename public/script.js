@@ -448,10 +448,35 @@
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProto}//${location.host}`);
+    
     ws.onmessage = (evt) => {
+      // Check for special refresh command
+      if (evt.data.trim() === '[REFRESH]') {
+        console.log('Received refresh command from server, reloading page...');
+        showToast('Main application restarting, refreshing page...', 'info');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+        return;
+      }
+      
       allLogs.push(evt.data);
       renderLogs();
       console.debug('[Logs] Received message', evt.data);
+    };
+    
+    ws.onclose = (evt) => {
+      console.log('WebSocket connection closed, attempting to reconnect...');
+      // If the connection closes unexpectedly, try to reconnect after a delay
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.CLOSED) {
+          window.location.reload();
+        }
+      }, 5000);
+    };
+    
+    ws.onerror = (evt) => {
+      console.error('WebSocket error:', evt);
     };
 
     fetchEnvs();
