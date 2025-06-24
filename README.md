@@ -92,9 +92,17 @@ This feature allows you to preserve specific folders across deployments and roll
 
 You can configure persistent folders in two ways:
 
-1. **Environment Variable**: Set the `PERSISTENT_FOLDERS` environment variable to a comma-separated list of folder names (e.g., `uploads,data,config`).
+1. **Environment Variable**: Set the `PERSISTENT_FOLDERS` environment variable to a comma-separated list of folder paths (e.g., `uploads,frontend/node_modules,data/cache`).
 
-2. **UI Configuration**: In the web interface, under the "Configuration" section, there is an input field for "Persistent Folders". Enter a comma-separated list of folder names. The UI configuration takes precedence over the environment variable.
+2. **UI Configuration**: In the web interface, under the "Configuration" section, there is an input field for "Persistent Folders". Enter a comma-separated list of folder paths. The UI configuration takes precedence over the environment variable.
+
+### Supported Path Formats
+
+- **Simple folder names**: `uploads`, `data`, `config`
+- **Nested paths**: `frontend/node_modules`, `backend/uploads`, `src/assets/images`
+- **Mixed configurations**: `uploads,frontend/dist,backend/data/cache`
+
+**Security Note**: All paths are validated to prevent directory traversal attacks. Paths must be relative and cannot contain `..` components or absolute path references.
 
 ### How It Works
 
@@ -112,7 +120,9 @@ You can configure persistent folders in two ways:
 For projects with large dependencies (like React apps), follow this workaround to avoid uploading the heavy `node_modules` folder:
 
 1. **Exclude node_modules** from your deployment zip file
-2. **Add node_modules to persistent folders** in the UI or via `PERSISTENT_FOLDERS=node_modules` environment variable
+2. **Add node_modules to persistent folders** in the UI or via environment variable:
+   - For root-level: `PERSISTENT_FOLDERS=node_modules`
+   - For nested paths: `PERSISTENT_FOLDERS=frontend/node_modules,backend/node_modules`
 3. **Upload** your application code without node_modules
 4. **Set the startup commands** in this order:
    ```
@@ -122,7 +132,7 @@ For projects with large dependencies (like React apps), follow this workaround t
 
 This will:
 - Keep your deployment package small
-- Preserve node_modules between deployments
+- Preserve node_modules between deployments (even for nested project structures)
 - Automatically install any missing dependencies
 - Ensure all required dependencies are present before launching the app
 

@@ -475,8 +475,13 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
   
   // Backup persistent folders from current deployment before starting the new one
   if (config.basePath) {
-    console.debug('Backing up persistent folders from current deployment');
-    await backupPersistentFolders(config.basePath, persistentDir, config);
+    try {
+      console.debug('Backing up persistent folders from current deployment');
+      await backupPersistentFolders(config.basePath, persistentDir, config);
+    } catch (persistentError) {
+      console.error('Error backing up persistent folders:', persistentError.message);
+      return res.status(400).json({ error: `Persistent folders configuration error: ${persistentError.message}` });
+    }
   }
 
   const deploymentPath = path.join(deploymentsDir, new Date().toISOString().replace(/[:.]/g, '-'));
@@ -537,8 +542,13 @@ app.post('/upload', bearerAuth, upload.single('file'), async (req, res) => {
     await saveConfig();
     
     // Restore persistent folders to the new deployment
-    console.debug('Restoring persistent folders to new deployment');
-    await restorePersistentFolders(deploymentPath, persistentDir, config);
+    try {
+      console.debug('Restoring persistent folders to new deployment');
+      await restorePersistentFolders(deploymentPath, persistentDir, config);
+    } catch (persistentError) {
+      console.error('Error restoring persistent folders:', persistentError.message);
+      // Don't fail the deployment, just log the error
+    }
     
     await startApp();
 
@@ -616,8 +626,13 @@ app.post('/api/deployments/rollback/:version', async (req, res) => {
     
     // Backup persistent folders from the current deployment before rolling back
     if (config.basePath) {
-      console.debug('Backing up persistent folders before rollback');
-      await backupPersistentFolders(config.basePath, persistentDir, config);
+      try {
+        console.debug('Backing up persistent folders before rollback');
+        await backupPersistentFolders(config.basePath, persistentDir, config);
+      } catch (persistentError) {
+        console.error('Error backing up persistent folders before rollback:', persistentError.message);
+        // Continue with rollback even if backup fails
+      }
     }
     
     config.basePath = targetPath;
@@ -625,8 +640,13 @@ app.post('/api/deployments/rollback/:version', async (req, res) => {
     await saveConfig();
     
     // Restore persistent folders to the rollback deployment
-    console.debug('Restoring persistent folders to rollback deployment');
-    await restorePersistentFolders(targetPath, persistentDir, config);
+    try {
+      console.debug('Restoring persistent folders to rollback deployment');
+      await restorePersistentFolders(targetPath, persistentDir, config);
+    } catch (persistentError) {
+      console.error('Error restoring persistent folders to rollback deployment:', persistentError.message);
+      // Continue with rollback even if restore fails
+    }
     
     await startApp();
     res.json({ message: `Rolled back to deployment: ${version}` });

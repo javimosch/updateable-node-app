@@ -6,6 +6,14 @@
   "bin": {
     "upncli": "./bin/upncli"
   },
+  "author": {
+        "name": "Javier Leandro Arancibia",
+        "url": "https://github.com/javimosch"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/javimosch/updateable-node-app"
+    },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -26,6 +34,5 @@
     "nodejs",
     "docker"
   ],
-  "author": "UPN CLI",
   "license": "MIT"
 }

@@ -8,13 +8,66 @@ const path = require('path');
 /**
  * Read and parse persistent folders configuration
  * @param {Object} [config] - Optional config object containing persistentFoldersUI
- * @returns {string[]} Array of folder names to be persisted
+ * @returns {string[]} Array of folder paths to be persisted
  */
 function getPersistentFolders(config) {
   // UI configuration takes priority over environment variable
   const folders = config?.persistentFoldersUI || process.env.PERSISTENT_FOLDERS || '';
   console.debug(`Using persistent folders: ${folders}`);
-  return folders.split(',').map(folder => folder.trim()).filter(Boolean);
+  return folders.split(',').map(folder => folder.trim()).filter(Boolean).map(validateFolderPath);
+}
+
+/**
+ * Validate and normalize a folder path to prevent directory traversal attacks
+ * @param {string} folderPath - The folder path to validate
+ * @returns {string} The normalized folder path
+ * @throws {Error} If the path is invalid or contains directory traversal attempts
+ */
+function validateFolderPath(folderPath) {
+  if (!folderPath || typeof folderPath !== 'string') {
+    throw new Error('Folder path must be a non-empty string');
+  }
+  
+  // Trim whitespace
+  const trimmed = folderPath.trim();
+  if (!trimmed) {
+    throw new Error('Folder path must be a non-empty string');
+  }
+  
+  // Check for absolute paths before normalization (including Windows paths)
+  if (path.isAbsolute(trimmed) || /^[a-zA-Z]:[\/\\]/.test(trimmed)) {
+    throw new Error(`Invalid folder path: ${folderPath}. Paths must be relative and cannot contain '..' components.`);
+  }
+  
+  // Remove leading/trailing slashes first to avoid absolute path detection issues
+  const withoutSlashes = trimmed.replace(/^[\/\\]+|[\/\\]+$/g, '');
+  
+  if (!withoutSlashes) {
+    throw new Error(`Invalid folder path: ${folderPath}. Path cannot be empty after normalization.`);
+  }
+  
+  // Normalize the path to resolve any '..' or '.' components
+  const normalized = path.normalize(withoutSlashes);
+  
+  // Check for directory traversal attempts after normalization
+  if (normalized.includes('..')) {
+    throw new Error(`Invalid folder path: ${folderPath}. Paths must be relative and cannot contain '..' components.`);
+  }
+  
+  // Final check for absolute paths after normalization
+  if (path.isAbsolute(normalized)) {
+    throw new Error(`Invalid folder path: ${folderPath}. Paths must be relative and cannot contain '..' components.`);
+  }
+  
+  // Convert backslashes to forward slashes for consistency
+  const cleaned = normalized.replace(/\\/g, '/');
+  
+  if (!cleaned) {
+    throw new Error(`Invalid folder path: ${folderPath}. Path cannot be empty after normalization.`);
+  }
+  
+  console.debug(`Validated folder path: ${folderPath} -> ${cleaned}`);
+  return cleaned;
 }
 
 /**
@@ -127,8 +180,10 @@ async function restorePersistentFolders(newDeploymentPath, persistentDir, config
  */
 async function moveDirectory(sourceDir, targetDir) {
   try {
-    // Ensure target parent directory exists
-    await fs.mkdir(path.dirname(targetDir), { recursive: true });
+    // Ensure target parent directory exists (important for nested paths)
+    const targetParent = path.dirname(targetDir);
+    await fs.mkdir(targetParent, { recursive: true });
+    console.debug(`Ensured parent directory exists: ${targetParent}`);
     
     // Try atomic move first (fastest, works on same filesystem)
     await fs.rename(sourceDir, targetDir);
@@ -137,6 +192,11 @@ async function moveDirectory(sourceDir, targetDir) {
     // If rename fails (likely cross-device), fall back to copy+delete
     if (renameError.code === 'EXDEV' || renameError.code === 'ENOTSUP') {
       console.debug(`Rename failed (${renameError.code}), falling back to copy+delete: ${sourceDir} -> ${targetDir}`);
+      
+      // Ensure target parent directory exists before copying
+      const targetParent = path.dirname(targetDir);
+      await fs.mkdir(targetParent, { recursive: true });
+      
       await copyDirectory(sourceDir, targetDir);
       await fs.rm(sourceDir, { recursive: true, force: true });
       console.debug(`Successfully copied and deleted directory: ${sourceDir} -> ${targetDir}`);
@@ -173,5 +233,6 @@ module.exports = {
   getPersistentFolders,
   backupPersistentFolders,
   restorePersistentFolders,
-  ensurePersistentDir
+  ensurePersistentDir,
+  validateFolderPath
 };
