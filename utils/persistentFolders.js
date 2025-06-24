@@ -59,14 +59,14 @@ async function backupPersistentFolders(currentDeploymentPath, persistentDir, con
     }
   }
   
-  // Copy persistent folders from current deployment to persistent directory
+  // Move persistent folders from current deployment to persistent directory
   for (const folder of persistentFolders) {
     const sourcePath = path.join(currentDeploymentPath, folder);
     const targetPath = path.join(persistentDir, folder);
     
     if (fsSync.existsSync(sourcePath)) {
       console.debug(`Backing up persistent folder: ${folder}`);
-      await copyDirectory(sourcePath, targetPath);
+      await moveDirectory(sourcePath, targetPath);
     } else {
       console.debug(`Persistent folder not found in current deployment: ${folder}`);
     }
@@ -104,14 +104,14 @@ async function restorePersistentFolders(newDeploymentPath, persistentDir, config
     }
   }
   
-  // Copy persistent folders from persistent directory to new deployment
+  // Move persistent folders from persistent directory to new deployment
   for (const folder of persistentFolders) {
     const sourcePath = path.join(persistentDir, folder);
     const targetPath = path.join(newDeploymentPath, folder);
     
     if (fsSync.existsSync(sourcePath)) {
       console.debug(`Restoring persistent folder: ${folder}`);
-      await copyDirectory(sourcePath, targetPath);
+      await moveDirectory(sourcePath, targetPath);
     } else {
       console.debug(`No persistent folder to restore: ${folder}`);
     }
@@ -121,7 +121,34 @@ async function restorePersistentFolders(newDeploymentPath, persistentDir, config
 }
 
 /**
- * Helper function to recursively copy a directory
+ * Helper function to move a directory, with fallback to copy+delete for cross-device scenarios
+ * @param {string} sourceDir - Source directory
+ * @param {string} targetDir - Target directory
+ */
+async function moveDirectory(sourceDir, targetDir) {
+  try {
+    // Ensure target parent directory exists
+    await fs.mkdir(path.dirname(targetDir), { recursive: true });
+    
+    // Try atomic move first (fastest, works on same filesystem)
+    await fs.rename(sourceDir, targetDir);
+    console.debug(`Successfully moved directory: ${sourceDir} -> ${targetDir}`);
+  } catch (renameError) {
+    // If rename fails (likely cross-device), fall back to copy+delete
+    if (renameError.code === 'EXDEV' || renameError.code === 'ENOTSUP') {
+      console.debug(`Rename failed (${renameError.code}), falling back to copy+delete: ${sourceDir} -> ${targetDir}`);
+      await copyDirectory(sourceDir, targetDir);
+      await fs.rm(sourceDir, { recursive: true, force: true });
+      console.debug(`Successfully copied and deleted directory: ${sourceDir} -> ${targetDir}`);
+    } else {
+      // Re-throw other errors
+      throw renameError;
+    }
+  }
+}
+
+/**
+ * Helper function to recursively copy a directory (used as fallback for cross-device moves)
  * @param {string} sourceDir - Source directory
  * @param {string} targetDir - Target directory
  */

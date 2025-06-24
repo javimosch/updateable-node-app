@@ -99,11 +99,13 @@ You can configure persistent folders in two ways:
 ### How It Works
 
 - **During Deployment/Rollback**:
-  1. Before deploying a new version or rolling back, the current version's persistent folders are backed up to a special directory: `/data/persistent`.
-  2. After the new version is deployed or the rollback is complete, the persistent folders are restored from `/data/persistent` to the new deployment directory.
+  1. Before deploying a new version or rolling back, the current version's persistent folders are **moved** (not copied) to a special directory: `/data/persistent`.
+  2. After the new version is deployed or the rollback is complete, the persistent folders are **moved** from `/data/persistent` to the new deployment directory.
   3. If the new deployment package (zip file) contains any of the persistent folders, they are removed before restoring from the backup to avoid conflicts.
 
-- **Note**: The `/data/persistent` directory is created automatically and is not part of any deployment. It is solely used for storing the persistent folders during transitions.
+- **Move Operations**: The system uses atomic move operations (`fs.rename()`) when possible for better performance and reduced disk usage. For cross-device scenarios (e.g., mounted volumes), it automatically falls back to copy+delete operations.
+
+- **Note**: The `/data/persistent` directory is created automatically and is not part of any deployment. It is solely used for temporarily storing the persistent folders during transitions.
 
 ## Handling Large Projects with node_modules
 
