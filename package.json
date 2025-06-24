@@ -9,7 +9,8 @@
     "scripts": {
         "start": "node server.js",
         "dev": "npx nodemon server.js -V --ignore deployments/* --ignore env-configs/* --ignore config.json --ignore __tests__ --ignore .upload_blacklist --ignore .upload_bearer --ignore persistent/* --ignore test/* --ignore uploads/* --ignore data/* --ignore tmp_code_*.bash --ignore tmp_code_*.*",
-        "test": "jest"
+        "test": "jest",
+        "publish":"docker compose build && docker compose push"
     },
     "dependencies": {
         "adm-zip": "^0.5.10",
