@@ -109,10 +109,11 @@ program.on('--help', () => {
   console.log('');
 });
 
-// Parse command line arguments first
-program.parse();
-
-// If no command was provided, start interactive mode
+// Check if no arguments provided before parsing
 if (!process.argv.slice(2).length) {
+  // Start interactive mode
   interactiveMenu();
+} else {
+  // Parse command line arguments for direct commands
+  program.parse();
 }
