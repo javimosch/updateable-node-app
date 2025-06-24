@@ -23,11 +23,15 @@ const wss = new WebSocket.Server({ server });
 console.debug('Server and WebSocket server created');
 
 const port = process.env.PORT||3888;
-const uploadsDir = path.join(__dirname,'data', 'uploads');
-const deploymentsDir = path.join(__dirname, 'data', 'deployments');
-const envsDir = path.join(__dirname, 'data', 'env-configs');
-const persistentDir = path.join(__dirname, 'data', 'persistent');
-const configPath = path.join(__dirname, 'data', 'config.json');
+
+// Use current working directory for data paths to support both Docker and local development
+// In Docker, the working directory is /app, locally it's the project root
+const dataDir = path.join(process.cwd(), 'data');
+const uploadsDir = path.join(dataDir, 'uploads');
+const deploymentsDir = path.join(dataDir, 'deployments');
+const envsDir = path.join(dataDir, 'env-configs');
+const persistentDir = path.join(dataDir, 'persistent');
+const configPath = path.join(dataDir, 'config.json');
 
 // --- Configuration ---
 let config = {
@@ -43,6 +47,22 @@ async function loadConfig() {
     const rawData = await fs.readFile(configPath);
     const savedConfig = JSON.parse(rawData);
     config = { ...config, ...savedConfig };
+    
+    // Fix basePath if it's using Docker paths (/app) but we're running locally
+    if (config.basePath && config.basePath.startsWith('/app/')) {
+      // Convert Docker path to local path
+      const relativePath = config.basePath.replace('/app/', '');
+      const localPath = path.join(process.cwd(), relativePath);
+      
+      // Check if the local path exists
+      if (fsSync.existsSync(localPath)) {
+        console.log(`Converting Docker path to local path: ${config.basePath} -> ${localPath}`);
+        config.basePath = localPath;
+        await saveConfig(); // Save the corrected path
+      } else {
+        console.warn(`Path not found locally: ${localPath}. Keeping original path: ${config.basePath}`);
+      }
+    }
   } else {
     await saveConfig();
   }
@@ -103,13 +123,6 @@ async function startApp() {
     envVars: truncatedEnvVars,
   });
 
-  appProcess = spawn(cmd, args, {
-    cwd: config.basePath,
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: envVars, // Inject environment variables
-  });
-
   const broadcast = (data) => {
     const message = data.toString();
     wss.clients.forEach((client) => {
@@ -119,20 +132,114 @@ async function startApp() {
     });
   };
 
-  appProcess.stdout.on('data', broadcast);
-  appProcess.stderr.on('data', broadcast);
+  // Determine the shell to use - try multiple options for better compatibility
+  let shellPath, shellArgs;
+  
+  if (process.platform === 'win32') {
+    shellPath = 'cmd.exe';
+    shellArgs = ['/c'];
+  } else {
+    // Try to find an available shell on Unix-like systems
+    const possibleShells = ['/bin/sh', '/bin/bash', '/bin/ash', '/usr/bin/sh'];
+    shellPath = possibleShells.find(shell => fsSync.existsSync(shell));
+    shellArgs = ['-c'];
+    
+    if (!shellPath) {
+      const errorMsg = `[SYSTEM] ERROR: No shell found. Tried: ${possibleShells.join(', ')}\n`;
+      console.error(errorMsg);
+      broadcast(errorMsg);
+      return;
+    }
+  }
+
+  // Broadcast startup information to UI
+  broadcast(`[SYSTEM] Starting application...\n`);
+  broadcast(`[SYSTEM] Command: ${config.command}\n`);
+  broadcast(`[SYSTEM] Working directory: ${config.basePath}\n`);
+  broadcast(`[SYSTEM] Shell: ${shellPath}\n`);
+  
+  // Additional validation
+  if (!fsSync.existsSync(config.basePath)) {
+    const errorMsg = `[SYSTEM] ERROR: Working directory does not exist: ${config.basePath}\n`;
+    console.error(errorMsg);
+    broadcast(errorMsg);
+    return;
+  }
+  
+  // Check if package.json exists for npm commands
+  if (config.command.includes('npm')) {
+    const packageJsonPath = path.join(config.basePath, 'package.json');
+    if (!fsSync.existsSync(packageJsonPath)) {
+      broadcast(`[SYSTEM] WARNING: package.json not found in working directory. npm commands may fail.\n`);
+    } else {
+      broadcast(`[SYSTEM] package.json found in working directory\n`);
+    }
+  }
+  
+  // For better compatibility, especially in Alpine Linux, use explicit shell execution
+  appProcess = spawn(shellPath, [...shellArgs, config.command], {
+    cwd: config.basePath,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: envVars, // Inject environment variables
+  });
+
+  appProcess.stdout.on('data', (data) => {
+    clearTimeout(startupTimeout);
+    broadcast(data);
+  });
+  appProcess.stderr.on('data', (data) => {
+    clearTimeout(startupTimeout);
+    broadcast(data);
+  });
+
+  // Handle successful spawn
+  appProcess.on('spawn', () => {
+    console.log('Subprocess started successfully');
+    broadcast(`[SYSTEM] Subprocess started successfully (PID: ${appProcess.pid})\n`);
+    clearTimeout(startupTimeout);
+  });
+
+  // Set a timeout to detect startup failures
+  const startupTimeout = setTimeout(() => {
+    if (appProcess && !appProcess.killed) {
+      broadcast(`[SYSTEM] WARNING: Process started but no output received within 10 seconds. This might indicate a startup issue.\n`);
+    }
+  }, 10000);
 
   appProcess.on('close', (code) => {
     console.log(`Child process exited with code ${code}`);
-    // Do not broadcast system message to UI, only log to server console
-    // broadcast(`[SYSTEM] Process exited with code ${code}.\n`);
+    const message = `[SYSTEM] Process exited with code ${code}.\n`;
+    broadcast(message);
+    clearTimeout(startupTimeout);
     appProcess = null;
   });
 
   appProcess.on('error', (err) => {
     console.error('Failed to start subprocess.', err);
-    // Do not broadcast system error to UI, only log to server console
-    // broadcast(`[SYSTEM] Error: ${err.message}.\n`);
+    const errorMessage = `[SYSTEM] Error starting subprocess: ${err.message}\n`;
+    const diagnosticInfo = `[SYSTEM] Command: ${config.command}\n[SYSTEM] Working directory: ${config.basePath}\n[SYSTEM] Shell: ${shellPath}\n`;
+    broadcast(errorMessage);
+    broadcast(diagnosticInfo);
+    
+    // Additional diagnostic information
+    if (err.code === 'ENOENT') {
+      broadcast(`[SYSTEM] ENOENT error suggests the shell or command was not found.\n`);
+      broadcast(`[SYSTEM] Checking if working directory exists...\n`);
+      if (fsSync.existsSync(config.basePath)) {
+        broadcast(`[SYSTEM] Working directory exists: ${config.basePath}\n`);
+        // Check if package.json exists
+        const packageJsonPath = path.join(config.basePath, 'package.json');
+        if (fsSync.existsSync(packageJsonPath)) {
+          broadcast(`[SYSTEM] package.json found in working directory\n`);
+        } else {
+          broadcast(`[SYSTEM] WARNING: package.json not found in working directory\n`);
+        }
+      } else {
+        broadcast(`[SYSTEM] ERROR: Working directory does not exist: ${config.basePath}\n`);
+      }
+    }
+    
+    clearTimeout(startupTimeout);
     appProcess = null;
   });
 }
@@ -468,18 +575,24 @@ app.delete('/api/envs/:name', async (req, res) => {
 async function main() {
   try {
     console.debug('Starting server initialization...');
+    console.debug(`Current working directory: ${process.cwd()}`);
+    console.debug(`Server script directory: ${__dirname}`);
+    console.debug(`Data directory: ${dataDir}`);
     
     // Create essential directories
     for (const dir of [uploadsDir, deploymentsDir, envsDir, persistentDir]) {
       if (!fsSync.existsSync(dir)) {
         console.debug(`Creating directory: ${dir}`);
         fsSync.mkdirSync(dir, { recursive: true });
+      } else {
+        console.debug(`Directory exists: ${dir}`);
       }
     }
 
     console.debug('Loading configuration...');
     await loadConfig();
     console.debug('Configuration loaded successfully');
+    console.debug(`Current config: ${JSON.stringify(config, null, 2)}`);
 
     // Auto-start on launch if configured
     if (config.basePath && fsSync.existsSync(config.basePath)) {
