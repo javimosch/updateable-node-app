@@ -83,9 +83,24 @@ async function startApp() {
   // 2. Spawn the process
   const [cmd, ...args] = config.command.split(/\s+/);
 
+  // Create a truncated version of envVars for logging (hide sensitive values)
+  const truncatedEnvVars = Object.keys(envVars).reduce((acc, key) => {
+    const value = envVars[key];
+    // Truncate values longer than 20 characters, showing first 10 and last 4 characters
+    if (typeof value === 'string' && value.length > 20) {
+      acc[key] = `${value.substring(0, 10)}...${value.substring(value.length - 4)}`;
+    } else if (typeof value === 'string' && value.length > 0) {
+      // For shorter values, show first few characters
+      acc[key] = `${value.substring(0, Math.min(6, value.length))}${value.length > 6 ? '...' : ''}`;
+    } else {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
   console.log(`Starting app with command: ${config.command}`,{
     cwd: config.basePath,
-    envVars,
+    envVars: truncatedEnvVars,
   });
 
   appProcess = spawn(cmd, args, {
@@ -464,7 +479,7 @@ async function main() {
 
     console.debug('Loading configuration...');
     await loadConfig();
-    console.debug('Configuration loaded:', config);
+    console.debug('Configuration loaded successfully');
 
     // Auto-start on launch if configured
     if (config.basePath && fsSync.existsSync(config.basePath)) {

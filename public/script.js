@@ -271,7 +271,7 @@
         envNameInput.value = data.name;
         if (!isEditingEnvContent) {
           envContentArea.value = data.content;
-          console.debug('[EnvContent] Updated from server', data.content);
+          console.debug('[EnvContent] Updated from server');
         } else {
           console.debug('[EnvContent] Skipped update, user editing');
         }
