@@ -7,6 +7,8 @@ const path = require('path')
 
 app.use(express.json());
 
+app.use(require('cors')())
+
 app.post('/api/envs', (req, res) => {
   const { name, content } = req.body;
   console.log(name, content);
@@ -91,6 +93,6 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 
   setInterval(() => {
-    console.log('tick tak v3');
+    console.log('tick tak v4');
   }, 1000);
 });
