@@ -110,8 +110,9 @@ You can configure persistent folders in two ways:
 For projects with large dependencies (like React apps), follow this workaround to avoid uploading the heavy `node_modules` folder:
 
 1. **Exclude node_modules** from your deployment zip file
-2. **Upload** your application code without node_modules
-3. **Set the startup commands** in this order:
+2. **Add node_modules to persistent folders** in the UI or via `PERSISTENT_FOLDERS=node_modules` environment variable
+3. **Upload** your application code without node_modules
+4. **Set the startup commands** in this order:
    ```
    npm install
    npm run start
@@ -119,7 +120,8 @@ For projects with large dependencies (like React apps), follow this workaround t
 
 This will:
 - Keep your deployment package small
-- Automatically install dependencies when the container starts
+- Preserve node_modules between deployments
+- Automatically install any missing dependencies
 - Ensure all required dependencies are present before launching the app
 
 For custom scripts, replace with your package.json scripts (e.g. `npm run build` before `npm run start` for React apps)
